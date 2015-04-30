@@ -1,0 +1,18 @@
+Instructions to reproduce the TCP Inigo experiments:
+
+Dependencies:
+- Linux Kernel with DCTCP
+- Mininet code (git://github.com/mininet/mininet.git)
+- Netperf-wrapper (https://github.com/tohojo/netperf-wrapper)
+ - Note: name will change soon to "Flent: The Flexible Network Tester"
+
+run-inigo.sh is a wrapper around inigo.py, which has many options.
+
+./run-inigo.sh
+
+Performs a simple experiment involving two or more iperf TCP streams
+from separate hosts going to the same server.
+
+./run-inigo.sh rrul_be
+
+Performs Flent's RRUL_BE test.
