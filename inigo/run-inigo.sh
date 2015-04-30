@@ -23,8 +23,8 @@ best_techs="cubic+ecn+$aqm dctcp+ecn+$aqm inigo+ecn+$aqm"
 # link properties
 bw=10
 delay="10ms" # delay per link, so RTT is 2X
-t=5
-offset=1     # seconds between client starts
+t=30
+offset=10     # seconds between client starts
 n=3
 maxq=425
 commonargs="--bw $bw --delay $delay --maxq $maxq -t $t --offset $offset -n $n $exp_opt"
@@ -43,6 +43,10 @@ function postprocess () {
   
   cp $odir/qlen_s1-eth1.txt $zoodir/$tech
   
+  echo python ../util/plot_cpu.py -f $odir/cpu.txt -o $odir/cpu-${tech}.png
+  python ../util/plot_cpu.py -f $odir/cpu.txt -o $odir/cpu-${tech}.png
+  mv $odir/cpu-${tech}.png $zoodir/
+
   if [ "$experiment" == "iperf" ]; then
     echo python ../util/plot_tcpprobe.py -f $odir/tcp_probe.txt -o $odir/cwnd-${tech}.png
     python ../util/plot_tcpprobe.py -f $odir/tcp_probe.txt -o $odir/cwnd-${tech}.png

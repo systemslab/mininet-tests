@@ -363,10 +363,8 @@ def main():
     tech = s1.cmd('cat /proc/sys/net/ipv4/tcp_congestion_control').rstrip('\r\n')
     if args.fqcodel:
         tech = tech + '+fqcodel'
-    if args.ecn and not args.dctcp:
+    if args.ecn:
         tech = tech + '+ecn'
-    if not args.ecn and args.dctcp:
-        tech = tech + '+noecn'
 
     exp_desc="{} Mbps, {} one way delay, tech: {}".format(args.bw, args.delay, tech)
     exp_output="bw{}-d{}-{}".format(args.bw, args.delay, tech)
@@ -394,10 +392,9 @@ def main():
         print "Waiting for tcp_probe"
         progress(5)
 
-    if args.more_monitoring:
-        monitor = multiprocessing.Process(target=monitor_cpu, args=('%s/cpu.txt' % args.dir,))
-        monitor.start()
-        monitors.append(monitor)
+    monitor = multiprocessing.Process(target=monitor_cpu, args=('%s/cpu.txt' % args.dir,))
+    monitor.start()
+    monitors.append(monitor)
 
     if args.more_monitoring:
         monitor = multiprocessing.Process(target=monitor_devs_ng, args=('%s/txrate.txt' % args.dir, 0.01))
