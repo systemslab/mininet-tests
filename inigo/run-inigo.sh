@@ -14,9 +14,9 @@ fi
 # all combinations of tcp, ecn, and aqm are tried
 # limit tcps and *_techs to at most 8 (queue plotting script limit)
 #tcps="reno westwood vegas cubic inigo dctcp"
-tcps="cubic inigo dctcp"
+tcps="cubic dctcp inigo"
 ecn="ecn"
-aqm="fqcodel"
+aqm="cake"
 expected_www_techs="cubic cubic+$aqm inigo inigo+$aqm"
 best_techs="cubic+ecn+$aqm dctcp+ecn+$aqm inigo+ecn+$aqm"
 
@@ -51,9 +51,9 @@ function postprocess () {
   
   cp $odir/qlen_s1-eth1.txt $zoodir/$tech
   
-  echo python ../util/plot_cpu.py -f $odir/cpu.txt -o $odir/cpu-${tech}.png
-  python ../util/plot_cpu.py -f $odir/cpu.txt -o $odir/cpu-${tech}.png
-  mv $odir/cpu-${tech}.png $zoodir/
+  #echo python ../util/plot_cpu.py -f $odir/cpu.txt -o $odir/cpu-${tech}.png
+  #python ../util/plot_cpu.py -f $odir/cpu.txt -o $odir/cpu-${tech}.png
+  #mv $odir/cpu-${tech}.png $zoodir/
 
   if [ "$experiment" == "iperf" ]; then
     echo python ../util/plot_tcpprobe.py -f $odir/tcp_probe.txt -o $odir/cwnd-${tech}.png
@@ -104,14 +104,20 @@ for tcp in $tcps; do
   echo runexperiment ${tcp}
   runexperiment ${tcp}
 
-  echo runexperiment ${tcp} ${ecn}
-  runexperiment ${tcp} ${ecn}
+  if [ "${ecn}" ]; then
+    echo runexperiment ${tcp} ${ecn}
+    runexperiment ${tcp} ${ecn}
+  fi
 
-  echo runexperiment ${tcp} ${aqm}
-  runexperiment ${tcp} ${aqm}
+  if [ "${aqm}" ]; then
+    echo runexperiment ${tcp} ${aqm}
+    runexperiment ${tcp} ${aqm}
+  fi
 
-  echo runexperiment ${tcp} ${ecn} ${aqm}
-  runexperiment ${tcp} ${ecn} ${aqm}
+  if [ "${ecn}" ] && [ "${aqm}" ]; then
+    echo runexperiment ${tcp} ${ecn} ${aqm}
+    runexperiment ${tcp} ${ecn} ${aqm}
+  fi
 done
 
 cd $zoodir
@@ -120,23 +126,38 @@ echo ../../util/plot_queue.R $tcps
 mv qlen.png qlen-all-plain.png
 mv qlen-cdf.png qlen-cdf-all-plain.png
 
+if [ "$ecn" ]; then
 echo ../../util/plot_queue.R *+${ecn}
 ../../util/plot_queue.R *+${ecn}
 mv qlen.png qlen-all+${ecn}.png
 mv qlen-cdf.png qlen-cdf-all+${ecn}.png
+fi
 
+if [ "$aqm" ]; then
+echo ../../util/plot_queue.R *+${aqm}
+../../util/plot_queue.R *+${aqm}
+mv qlen.png qlen-all+${aqm}.png
+mv qlen-cdf.png qlen-cdf-all+${aqm}.png
+fi
+
+if [ "$ecn" ] && [ "$aqm" ]; then
 echo ../../util/plot_queue.R *+${ecn}+${aqm}
 ../../util/plot_queue.R *+${ecn}+${aqm}
 mv qlen.png qlen-all+${ecn}+${aqm}.png
 mv qlen-cdf.png qlen-cdf-all+${ecn}+${aqm}.png
+fi
 
+if [ "$expected_www_techs" ]; then
 echo ../../util/plot_queue.R $expected_www_techs
 ../../util/plot_queue.R $expected_www_techs
 mv qlen.png qlen-expectedwww.png
 mv qlen-cdf.png qlen-cdf-expectedwww.png
+fi
 
+if [ "$best_techs" ]; then
 echo ../../util/plot_queue.R $best_techs
 ../../util/plot_queue.R $best_techs
 mv qlen.png qlen-best.png
 mv qlen-cdf.png qlen-cdf-best.png
 cd ..
+fi

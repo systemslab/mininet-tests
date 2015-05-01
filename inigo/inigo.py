@@ -132,7 +132,13 @@ parser.add_argument('--ecn',
 parser.add_argument('--fqcodel',
                     dest="fqcodel",
                     action="store_true",
-                    help="Enable FQ_Codel",
+                    help="Enable FQ_Codel qdisc",
+                    default=False)
+
+parser.add_argument('--cake',
+                    dest="cake",
+                    action="store_true",
+                    help="Enable Cake qdisc",
                     default=False)
 
 parser.add_argument('--use-bridge',
@@ -264,6 +270,14 @@ def enable_fqcodel(node=None):
     else:
         node.popen("tc qdisc add dev {}-eth0 parent 5:1 handle 10: fq_codel limit 1200".format(node), shell=True).wait()
 
+def enable_cake(node=None):
+    if not node:
+        return
+
+    enable_tcp_ecn(node)
+    print "tc qdisc add dev {}-eth0 parent 5:1 handle 10: cake".format(node)
+    node.popen("tc qdisc add dev {}-eth0 parent 5:1 handle 10: cake".format(node), shell=True).wait()
+
 def enable_reno():
     Popen("/bin/echo reno > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
 
@@ -349,9 +363,13 @@ def main():
         # we only want red and delay on switches
         node.popen("tc qdisc del dev {}-eth0 parent 5:1 red limit 1000000b avpkt 1000".format(node), shell=True).wait()
         node.popen("tc qdisc del dev {}-eth0 parent 6: netem".format(node), shell=True).wait()
+        node.popen("tc qdisc del dev {}-eth0 parent 5:1 netem".format(node), shell=True).wait()
 
         if args.fqcodel:
             enable_fqcodel(node)
+
+        if args.cake:
+            enable_cake(node)
 
         if args.bw <= 10:
             node.popen('echo 1514 > /sys/class/net/%s-eth0/queues/tx-0/byte_queue_limits/limit' % (nn), shell=True)
@@ -363,6 +381,8 @@ def main():
     tech = s1.cmd('cat /proc/sys/net/ipv4/tcp_congestion_control').rstrip('\r\n')
     if args.fqcodel:
         tech = tech + '+fqcodel'
+    if args.cake:
+        tech = tech + '+cake'
     if args.ecn:
         tech = tech + '+ecn'
 
@@ -392,11 +412,11 @@ def main():
         print "Waiting for tcp_probe"
         progress(5)
 
-    monitor = multiprocessing.Process(target=monitor_cpu, args=('%s/cpu.txt' % args.dir,))
-    monitor.start()
-    monitors.append(monitor)
-
     if args.more_monitoring:
+        monitor = multiprocessing.Process(target=monitor_cpu, args=('%s/cpu.txt' % args.dir,))
+        monitor.start()
+        monitors.append(monitor)
+
         monitor = multiprocessing.Process(target=monitor_devs_ng, args=('%s/txrate.txt' % args.dir, 0.01))
         monitor.start()
         monitors.append(monitor)
@@ -408,6 +428,9 @@ def main():
     #CLI(net)
 
     h2 = net.getNodeByName('h2')
+    print h2.cmd("echo tcp_ecn && cat /proc/sys/net/ipv4/tcp_ecn")
+    print h2.cmd("echo tcp_ecn && cat /proc/sys/net/ipv4/tcp_congestion_control")
+    print h2.cmd("tc qdisc show")
 
     h2.popen('/bin/ping 10.0.0.1 > %s/ping.txt' % args.dir, shell=True)
     if args.more_monitoring or args.tcpdump:
@@ -462,6 +485,8 @@ def main():
     	    args.dir, shell=True)
     net.stop()
     Popen("killall -9 cat ping top bwm-ng netserver", shell=True).wait()
+
+    enable_cubic()
 
 if __name__ == '__main__':
     main()
