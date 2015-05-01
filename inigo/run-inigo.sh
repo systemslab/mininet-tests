@@ -34,6 +34,14 @@ echo commmonargs: $commonargs
 zoodir=$experiment-zoo-n$n-bw$bw-d$delay
 mkdir $zoodir
 
+bz() {
+    if hash pbzip2 2>/dev/null; then
+        pbzip2 "$@"
+    else
+        bzip2 "$@"
+    fi
+}
+
 function postprocess () {
   tech=$1
   odir=$2
@@ -70,6 +78,8 @@ function postprocess () {
     # move remaining pngs
     mv $odir/*.png $zoodir/
   fi
+
+  bz $odir/tcp_probe.txt
 }
 
 function runexperiment () {
