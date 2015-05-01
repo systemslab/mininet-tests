@@ -487,7 +487,7 @@ def main():
     net.getNodeByName('s1').pexec("/sbin/tc -s qdisc > %s/tc-stats-s1.txt" %
     	    args.dir, shell=True)
     net.stop()
-    Popen("killall -9 cat ping top bwm-ng netserver", shell=True).wait()
+    Popen("killall -9 cat ping top bwm-ng netserver &> /dev/null", shell=True).wait()
 
     enable_cubic()
 
