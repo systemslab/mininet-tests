@@ -396,6 +396,11 @@ def main():
     h1 = net.getNodeByName('h1')
     print h1.cmd('ping -c 2 10.0.0.2')
 
+    # extra config check
+    print s1.cmd("echo -n 'tcp_congestion_control ' && cat /proc/sys/net/ipv4/tcp_congestion_control")
+    print h1.cmd("echo -n 'h1 tcp_ecn ' && cat /proc/sys/net/ipv4/tcp_ecn")
+    print h1.cmd("echo h1 traffic control && tc qdisc show")
+
     clients = [net.getNodeByName('h%d' % (i+1)) for i in xrange(1, args.n)]
 
     if not args.flent:
@@ -428,9 +433,7 @@ def main():
     #CLI(net)
 
     h2 = net.getNodeByName('h2')
-    print h2.cmd("echo tcp_ecn && cat /proc/sys/net/ipv4/tcp_ecn")
-    print h2.cmd("echo tcp_ecn && cat /proc/sys/net/ipv4/tcp_congestion_control")
-    print h2.cmd("tc qdisc show")
+    print h2.cmd("echo h2 traffic control && tc qdisc show")
 
     h2.popen('/bin/ping 10.0.0.1 > %s/ping.txt' % args.dir, shell=True)
     if args.more_monitoring or args.tcpdump:
