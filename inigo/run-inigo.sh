@@ -68,11 +68,11 @@ function postprocess () {
   
     # timestamp,saddress,sport,daddress,dport,interval,transferred_bytes,bps
     for i in $(seq 2 $n); do
-      perl -ne "/10\.0\.0\.$i/ && ! /(0\.0-[^1])/ && print" $odir/iperf_h1.txt 2>> $postlog > $odir/host$i
+      perl -ne "/10\.0\.0\.$i/ && ! /(0\.0-[^1])/ && print" $odir/iperf_h1.txt 2>> $postlog > $odir/iperf-h$i
     done
     cd $odir
-    echo ../../util/plot_iperf.R $bw $offset host2 host3
-    ../../util/plot_iperf.R $bw $offset host2 host3 >> $postlog 2>&1
+    echo ../../util/plot_iperf.R $bw $offset $(ls iperf-h*)
+    ../../util/plot_iperf.R $bw $offset $(ls host*) >> $postlog 2>&1
     cd -
     mv $odir/iperf.png $zoodir/iperf-${tech}.png >> $postlog 2>&1
   else

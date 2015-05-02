@@ -364,6 +364,9 @@ def main():
         node.popen("tc qdisc del dev {}-eth0 parent 5:1 red limit 1000000b avpkt 1000".format(node), shell=True).wait()
         node.popen("tc qdisc del dev {}-eth0 parent 6: netem".format(node), shell=True).wait()
         node.popen("tc qdisc del dev {}-eth0 parent 5:1 netem".format(node), shell=True).wait()
+        node.popen("tc qdisc del dev {}-eth0 root htb".format(node), shell=True).wait()
+        node.popen("tc qdisc add dev {}-eth0 root handle 5: htb default 1 direct_qlen 2".format(node), shell=True).wait()
+        node.popen("tc class add dev {}-eth0 parent 5:0 classid 5:1 htb rate 100Mbit burst 3k".format(node), shell=True).wait()
 
         if args.fqcodel:
             enable_fqcodel(node)
@@ -399,7 +402,7 @@ def main():
     # extra config check
     print s1.cmd("echo -n 'tcp_congestion_control ' && cat /proc/sys/net/ipv4/tcp_congestion_control")
     print h1.cmd("echo -n 'h1 tcp_ecn ' && cat /proc/sys/net/ipv4/tcp_ecn")
-    print h1.cmd("echo h1 traffic control && tc qdisc show")
+    print h1.cmd("echo h1 traffic control && tc qdisc show && tc class show dev h1-eth0")
 
     clients = [net.getNodeByName('h%d' % (i+1)) for i in xrange(1, args.n)]
 
