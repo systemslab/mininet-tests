@@ -275,8 +275,23 @@ def enable_cake(node=None):
         return
 
     enable_tcp_ecn(node)
+    Popen("modprobe sch_cake", shell=True)
+    Popen("modprobe act_mirred", shell=True)
+
+    # outbound
+    node.popen("tc qdisc del dev {}-eth0 root htb".format(node), shell=True).wait()
     print "tc qdisc add dev {}-eth0 parent 5:1 handle 10: cake".format(node)
-    node.popen("tc qdisc add dev {}-eth0 parent 5:1 handle 10: cake".format(node), shell=True).wait()
+    node.popen("tc qdisc add dev {}-eth0 root cake bandwidth {}mbit".format(node, args.bw), shell=True).wait()
+
+    # inbound
+    node.popen("ip link add name {}-ifb4eth0 type ifb".format(node), shell=True).wait()
+    node.popen("tc qdisc del dev {}-eth0 ingress".format(node), shell=True).wait()
+    node.popen("tc qdisc add dev {}-eth0 handle ffff: ingress".format(node), shell=True).wait()
+    node.popen("tc qdisc del dev {}-ifb4eth0 root".format(node), shell=True).wait()
+    node.popen("tc qdisc add dev {}-ifb4eth0 root cake bandwidth {}mbit besteffort".format(node, args.bw), shell=True).wait()
+    # if you don't bring the device up your connection will lock up on the next step
+    node.popen("ifconfig {}-ifb4eth0 up".format(node), shell=True).wait()
+    node.popen("tc filter add dev {}-eth0 parent ffff: protocol all prio 10 u32 match u32 0 0 flowid 1:1 action mirred egress redirect dev {}-ifb4eth0".format(node, node), shell=True).wait()
 
 def enable_reno():
     Popen("/bin/echo reno > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
@@ -364,6 +379,7 @@ def main():
         node.popen("tc qdisc del dev {}-eth0 parent 5:1 red limit 1000000b avpkt 1000".format(node), shell=True).wait()
         node.popen("tc qdisc del dev {}-eth0 parent 6: netem".format(node), shell=True).wait()
         node.popen("tc qdisc del dev {}-eth0 parent 5:1 netem".format(node), shell=True).wait()
+        # and let's configure htb to have a smaller queue
         node.popen("tc qdisc del dev {}-eth0 root htb".format(node), shell=True).wait()
         node.popen("tc qdisc add dev {}-eth0 root handle 5: htb default 1 direct_qlen 2".format(node), shell=True).wait()
         node.popen("tc class add dev {}-eth0 parent 5:0 classid 5:1 htb rate 100Mbit burst 3k".format(node), shell=True).wait()
@@ -493,6 +509,8 @@ def main():
     Popen("killall -9 cat ping top bwm-ng netserver &> /dev/null", shell=True).wait()
 
     enable_cubic()
+    disable_dctcp()
+    disable_inigo()
 
 if __name__ == '__main__':
     main()

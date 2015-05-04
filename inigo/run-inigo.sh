@@ -33,7 +33,8 @@ t=${TEST_FLOW_DURATION:=30}
 offset=${TEST_FLOW_OFFSET:=10}	# seconds between client starts
 n=${TEST_SIZE:=3}		# 1 server and n-1 clients
 maxq=${TEST_MAXQ:=425}		# size of bottleneck queue
-commonargs="--bw $bw --delay $delay --maxq $maxq -t $t --offset $offset -n $n $exp_opt"
+extra_args=${TEST_EXTRA_ARGS:=""}
+commonargs="--bw $bw --delay $delay --maxq $maxq -t $t --offset $offset -n $n $extra_args $exp_opt"
 
 echo commmonargs: $commonargs
 
@@ -68,11 +69,11 @@ function postprocess () {
   
     # timestamp,saddress,sport,daddress,dport,interval,transferred_bytes,bps
     for i in $(seq 2 $n); do
-      perl -ne "/10\.0\.0\.$i/ && ! /(0\.0-[^1])/ && print" $odir/iperf_h1.txt 2>> $postlog > $odir/iperf-h$i
+      perl -ne "/10\.0\.0\.$i,/ && ! /(0\.0-[^1])/ && print" $odir/iperf_h1.txt 2>> $postlog > $odir/iperf-h$i
     done
     cd $odir
     echo ../../util/plot_iperf.R $bw $offset $(ls iperf-h*)
-    ../../util/plot_iperf.R $bw $offset $(ls host*) >> $postlog 2>&1
+    ../../util/plot_iperf.R $bw $offset $(ls iperf-h*) >> $postlog 2>&1
     cd -
     mv $odir/iperf.png $zoodir/iperf-${tech}.png >> $postlog 2>&1
   else
@@ -86,6 +87,7 @@ function postprocess () {
   fi
 
   bz $odir/tcp_probe.txt >> $postlog 2>&1
+  bz $odir/h1_tcpdump.pcap >> $postlog 2>&1
 }
 
 function runexperiment () {
