@@ -129,6 +129,12 @@ parser.add_argument('--ecn',
                     help="Enable ECN (net.ipv4.tcp_ecn)",
                     default=False)
 
+parser.add_argument('--constrain-htb',
+                    dest="constrain_htb",
+                    action="store_true",
+                    help="Configure a contrained (2 packet qlen) on clients",
+                    default=False)
+
 parser.add_argument('--fqcodel',
                     dest="fqcodel",
                     action="store_true",
@@ -257,6 +263,14 @@ def disable_tcp_ecn(node=None):
 
     node.popen("sysctl -w net.ipv4.tcp_ecn=0", shell=True).wait()
 
+def constrain_htb(node=None):
+    if not node:
+        return
+
+    node.popen("tc qdisc del dev {}-eth0 root htb".format(node), shell=True).wait()
+    node.popen("tc qdisc add dev {}-eth0 root handle 5: htb default 1 direct_qlen 2".format(node), shell=True).wait()
+    node.popen("tc class add dev {}-eth0 parent 5:0 classid 5:1 htb rate {}Mbit burst 3k".format(node. args.bw), shell=True).wait()
+
 def enable_fqcodel(node=None):
     if not node:
         return
@@ -375,14 +389,13 @@ def main():
         else:
             disable_tcp_ecn(node)
 
-        # we only want red and delay on switches
+        # we only want red and delay on switches so we can be free to add other qdiscs to hosts
         node.popen("tc qdisc del dev {}-eth0 parent 5:1 red limit 1000000b avpkt 1000".format(node), shell=True).wait()
         node.popen("tc qdisc del dev {}-eth0 parent 6: netem".format(node), shell=True).wait()
         node.popen("tc qdisc del dev {}-eth0 parent 5:1 netem".format(node), shell=True).wait()
-        # and let's configure htb to have a smaller queue
-        node.popen("tc qdisc del dev {}-eth0 root htb".format(node), shell=True).wait()
-        node.popen("tc qdisc add dev {}-eth0 root handle 5: htb default 1 direct_qlen 2".format(node), shell=True).wait()
-        node.popen("tc class add dev {}-eth0 parent 5:0 classid 5:1 htb rate 100Mbit burst 3k".format(node), shell=True).wait()
+
+        if args.constrain_htb:
+            constrain_htb(node)
 
         if args.fqcodel:
             enable_fqcodel(node)
@@ -452,7 +465,7 @@ def main():
     #CLI(net)
 
     h2 = net.getNodeByName('h2')
-    print h2.cmd("echo h2 traffic control && tc qdisc show")
+    print h2.cmd("echo h2 traffic control && tc qdisc show && tc class show dev h2-eth0")
 
     h2.popen('/bin/ping 10.0.0.1 > %s/ping.txt' % args.dir, shell=True)
     if args.more_monitoring or args.tcpdump:
