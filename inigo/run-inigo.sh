@@ -1,5 +1,8 @@
 #!/bin/bash
 
+UTIL_DIR=$PWD/../util
+export PATH=$PATH:$UTIL_DIR
+
 # usage: ./run-inigo.sh [<flent experiment>]
 # if a Flent experiment isn't specified, then a simple iperf test is run
 if [ -z "$1" ]; then
@@ -48,6 +51,21 @@ bz() {
     fi
 }
 
+function downsample () {
+  infile=$1
+  outfile=$2
+
+  cat $infile | perl -e '
+    my $percentage = $ARGV[0];
+    my $outfile = $ARGV[1];
+    open OUT1, ">", "$outfile" or die $!;
+    while (<STDIN>) {
+        if (rand(100) < $percentage) { print OUT1 $_; }
+    }
+    close OUT1 or die $!;
+' 10 $outfile
+}
+
 function postprocess () {
   tech=$1
   odir=$2
@@ -56,35 +74,49 @@ function postprocess () {
 
   sudo chown -R $user $odir
   
-  cp $odir/qlen_s1-eth1.txt $zoodir/$tech
+  mkdir $zoodir/qlen_s1-eth1
+  mv $odir/qlen_s1-eth1.txt $zoodir/qlen_s1-eth1/$tech
   
-  #echo python ../util/plot_cpu.py -f $odir/cpu.txt -o $odir/cpu-${tech}.png
-  #python ../util/plot_cpu.py -f $odir/cpu.txt -o $odir/cpu-${tech}.png
+  #echo python $UTIL_DIR/plot_cpu.py -f $odir/cpu.txt -o $odir/cpu-${tech}.png
+  #python $UTIL_DIR/plot_cpu.py -f $odir/cpu.txt -o $odir/cpu-${tech}.png
   #mv $odir/cpu-${tech}.png $zoodir/
 
+  if [ -f $odir/tcp_probe.txt ]; then
+    mkdir $zoodir/tcp_probe_downsampled
+    cd $odir
+    echo plot_tcpprobe.R tcp_probe.txt
+    plot_tcpprobe.R tcp_probe.txt
+    mv srtt.png srtt-${tech}.png
+    mv srtt-cdf.png srtt-cdf-${tech}.png
+
+    # only keep the downsampled version, since the original grows so big
+    downsample tcp_probe.txt ../$zoodir/tcp_probe_downsampled/$tech
+    rm tcp_probe.txt
+    cd -
+  fi
+
   if [ "$experiment" == "iperf" ]; then
-    echo python ../util/plot_tcpprobe.py -f $odir/tcp_probe.txt -o $odir/cwnd-${tech}.png
-    python ../util/plot_tcpprobe.py -f $odir/tcp_probe.txt -o $odir/cwnd-${tech}.png
+    echo python $UTIL_DIR/plot_tcpprobe.py -f $zoodir/tcp_probe_downsampled/$tech -o $zoodir/cwnd-${tech}.png
+    python $UTIL_DIR/plot_tcpprobe.py -f $zoodir/tcp_probe_downsampled/$tech -o $zoodir/cwnd-${tech}.png
   
     # timestamp,saddress,sport,daddress,dport,interval,transferred_bytes,bps
     for i in $(seq 2 $n); do
       perl -ne "/10\.0\.0\.$i,/ && /(0\.0-1\.0)|([^0]+\.0-)/ && s/(\d+)\.0-\d+\.0/\$1/ && print" $odir/iperf_h1.txt > $odir/iperf-h$i
     done
     cd $odir
-    echo ../../util/plot_iperf.R $bw $offset $(ls iperf-h*)
-    ../../util/plot_iperf.R $bw $offset $(ls iperf-h*)
+    echo plot_iperf.R $bw $offset $(ls iperf-h*)
+    plot_iperf.R $bw $offset $(ls iperf-h*)
     cd -
     mv $odir/iperf.png $zoodir/iperf-${tech}.png
   else
-    ports=$(perl -ne '/10.0.0.1:(\d+)/ && print "$1\n"' $odir/tcp_probe.txt | sort | uniq | tr '\n' ' ')
-    echo python ../util/plot_tcpprobe.py -f $odir/tcp_probe.txt -o $odir/cwnd-${tech}.png -p $ports
-    python ../util/plot_tcpprobe.py -f $odir/tcp_probe.txt -o $odir/cwnd-${tech}.png -p $ports
+    ports=$(perl -ne '/10.0.0.1:(\d+)/ && print "$1\n"' $zoodir/tcp_probe_downsampled/$tech | sort | uniq | tr '\n' ' ')
+    echo python $UTIL_DIR/plot_tcpprobe.py -f $zoodir/tcp_probe_downsampled/$tech -o $zoodir/cwnd-${tech}.png -p $ports
+    python $UTIL_DIR/plot_tcpprobe.py -f $zoodir/tcp_probe_downsampled/$tech -o $zoodir/cwnd-${tech}.png -p $ports
   fi
 
   # move remaining pngs
   mv $odir/*.png $zoodir/
 
-  [ -f $odir/tcp_probe.txt ] && bz $odir/tcp_probe.txt
   [ -f $odir/h1_tcpdump.pcap ] && bz $odir/h1_tcpdump.pcap
 }
 
@@ -130,51 +162,80 @@ for tcp in $tcps; do
   fi
 done
 
-cd $zoodir
-echo ../../util/plot_queue.R $tcps
-../../util/plot_queue.R $tcps
+cd $zoodir/qlen_s1-eth1
+echo plot_queue.R $tcps
+plot_queue.R $tcps
 mv qlen.png qlen-all-plain.png
 mv qlen-cdf.png qlen-cdf-all-plain.png
 
 for tcp in $tcps; do
-  echo ../../util/plot_queue.R ${tcp}*
-  ../../util/plot_queue.R ${tcp}*
+  echo plot_queue.R ${tcp}*
+  plot_queue.R ${tcp}*
   mv qlen.png qlen-all-${tcp}.png
   mv qlen-cdf.png qlen-cdf-all-${tcp}.png
 done
 
 if [ "$ecn" ]; then
-echo ../../util/plot_queue.R *+${ecn}
-../../util/plot_queue.R *+${ecn}
-mv qlen.png qlen-all+${ecn}.png
-mv qlen-cdf.png qlen-cdf-all+${ecn}.png
+  echo plot_queue.R *+${ecn}
+  plot_queue.R *+${ecn}
+  mv qlen.png qlen-all+${ecn}.png
+  mv qlen-cdf.png qlen-cdf-all+${ecn}.png
 fi
 
 if [ "$aqm" ]; then
-echo ../../util/plot_queue.R *+${aqm}
-../../util/plot_queue.R *+${aqm}
-mv qlen.png qlen-all+${aqm}.png
-mv qlen-cdf.png qlen-cdf-all+${aqm}.png
+  echo plot_queue.R *+${aqm}
+  plot_queue.R *+${aqm}
+  mv qlen.png qlen-all+${aqm}.png
+  mv qlen-cdf.png qlen-cdf-all+${aqm}.png
 fi
 
 if [ "$ecn" ] && [ "$aqm" ]; then
-echo ../../util/plot_queue.R *+${ecn}+${aqm}
-../../util/plot_queue.R *+${ecn}+${aqm}
-mv qlen.png qlen-all+${ecn}+${aqm}.png
-mv qlen-cdf.png qlen-cdf-all+${ecn}+${aqm}.png
+  echo plot_queue.R *+${ecn}+${aqm}
+  plot_queue.R *+${ecn}+${aqm}
+  mv qlen.png qlen-all+${ecn}+${aqm}.png
+  mv qlen-cdf.png qlen-cdf-all+${ecn}+${aqm}.png
 fi
 
 if [ "$expected_www_techs" ]; then
-echo ../../util/plot_queue.R $expected_www_techs
-../../util/plot_queue.R $expected_www_techs
-mv qlen.png qlen-expectedwww.png
-mv qlen-cdf.png qlen-cdf-expectedwww.png
+  echo plot_queue.R $expected_www_techs
+  plot_queue.R $expected_www_techs
+  mv qlen.png qlen-expectedwww.png
+  mv qlen-cdf.png qlen-cdf-expectedwww.png
 fi
 
 if [ "$best_techs" ]; then
-echo ../../util/plot_queue.R $best_techs
-../../util/plot_queue.R $best_techs
-mv qlen.png qlen-best.png
-mv qlen-cdf.png qlen-cdf-best.png
-cd ..
+  echo plot_queue.R $best_techs
+  plot_queue.R $best_techs
+  mv qlen.png qlen-best.png
+  mv qlen-cdf.png qlen-cdf-best.png
 fi
+
+for tcp in $tcps; do
+  for f in $(ls ${tcp}*); do
+    bz $f
+  done
+done
+mv *png ../
+cd - # end qlen plotting
+
+
+cd $zoodir/tcp_probe_downsampled
+echo plot_tcpprobe.R $tcps
+plot_tcpprobe.R $tcps
+mv srtt.png srtt-all-plain.png
+mv srtt-cdf.png srtt-cdf-all-plain.png
+
+for tcp in $tcps; do
+  echo plot_tcpprobe.R ${tcp}*
+  plot_tcpprobe.R ${tcp}*
+  mv srtt.png srtt-all-${tcp}.png
+  mv srtt-cdf.png srtt-cdf-all-${tcp}.png
+done
+
+for tcp in $tcps; do
+  for f in $(ls ${tcp}*); do
+    bz $f
+  done
+done
+mv *png ../
+cd - # end srtt plotting

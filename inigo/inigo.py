@@ -39,6 +39,16 @@ parser.add_argument('--bw', '-B',
                     help="Bandwidth of links",
                     required=True)
 
+parser.add_argument('--delay',
+                    dest="delay",
+                    default="0.123ms  0.05ms distribution normal  ")
+# 1000 Mbps
+#	default="0.012ms  0.001ms distribution normal  ")
+# 100 Mbps
+#	default="0.123ms  0.05ms distribution normal  ")
+# 10 Mbps
+#	default="1.23ms  0.5ms distribution normal  ")
+
 parser.add_argument('--dir', '-d',
                     dest="dir",
                     action="store",
@@ -48,7 +58,7 @@ parser.add_argument('--dir', '-d',
 parser.add_argument('-n',
                     dest="n",
                     action="store",
-                    help="Number of nodes in star.  Must be >= 3",
+                    help="Number of nodes in star ",
                     required=True)
 
 parser.add_argument('-t',
@@ -99,6 +109,12 @@ parser.add_argument('--inigo',
                     help="Enable Inigo module",
                     default=False)
 
+parser.add_argument('--inigo-args',
+                    dest="inigo_args",
+                    action="store",
+                    help="Inigo module args",
+                    default="markthresh=180 dctcp_alpha_on_init=500 rtt_fairness=0 stabilize=0")
+
 parser.add_argument('--reno',
                     dest="reno",
                     action="store_true",
@@ -123,6 +139,12 @@ parser.add_argument('--cubic',
                     help="Enable CUBIC module",
                     default=False)
 
+parser.add_argument('--enable-offload',
+                    dest="enable_offload",
+                    action="store_true",
+                    help="Enable offload support",
+                    default=False)
+
 parser.add_argument('--ecn',
                     dest="ecn",
                     action="store_true",
@@ -132,7 +154,7 @@ parser.add_argument('--ecn',
 parser.add_argument('--constrain-htb',
                     dest="constrain_htb",
                     action="store_true",
-                    help="Configure a contrained (2 packet qlen) on clients",
+                    help="Configure a constrained (2 packet qlen and 97% bottleneck bandwidth) on clients",
                     default=False)
 
 parser.add_argument('--fqcodel',
@@ -170,16 +192,6 @@ parser.add_argument('--no-tcp-probe',
                     action="store_true",
                     help="Don't monitor using tcp_probe module (cwnd)",
                     default=False)
-
-parser.add_argument('--delay',
-	dest="delay",
-	default="0.123ms  0.05ms distribution normal  ")
-# 1000 Mbps
-#	default="0.012ms  0.001ms distribution normal  ")
-# 100 Mbps
-#	default="0.123ms  0.05ms distribution normal  ")
-# 10 Mbps
-#	default="1.23ms  0.5ms distribution normal  ")
 
 args = parser.parse_args()
 args.n = int(args.n)
@@ -269,7 +281,7 @@ def constrain_htb(node=None):
 
     node.popen("tc qdisc del dev {}-eth0 root htb".format(node), shell=True).wait()
     node.popen("tc qdisc add dev {}-eth0 root handle 5: htb default 1 direct_qlen 2".format(node), shell=True).wait()
-    node.popen("tc class add dev {}-eth0 parent 5:0 classid 5:1 htb rate {}Mbit burst 3k".format(node. args.bw), shell=True).wait()
+    node.popen("tc class add dev {}-eth0 parent 5:0 classid 5:1 htb rate {}Mbit burst 3k".format(node, 0.90*args.bw), shell=True).wait()
 
 def enable_fqcodel(node=None):
     if not node:
@@ -295,7 +307,7 @@ def enable_cake(node=None):
     # outbound
     node.popen("tc qdisc del dev {}-eth0 root htb".format(node), shell=True).wait()
     print "tc qdisc add dev {}-eth0 parent 5:1 handle 10: cake".format(node)
-    node.popen("tc qdisc add dev {}-eth0 root cake bandwidth {}mbit".format(node, args.bw), shell=True).wait()
+    node.popen("tc qdisc add dev {}-eth0 root cake bandwidth {}mbit".format(node, 0.90*args.bw), shell=True).wait()
 
     # inbound
     node.popen("ip link add name {}-ifb4eth0 type ifb".format(node), shell=True).wait()
@@ -327,7 +339,7 @@ def disable_dctcp():
     Popen("rmmod tcp_dctcp", shell=True).wait()
 
 def enable_inigo():
-    Popen("modprobe tcp_inigo markthresh=180 dctcp_alpha_on_init=500 rtt_fairness=0 stabilize=0", shell=True)
+    Popen("modprobe tcp_inigo {}".format(args.inigo_args), shell=True)
     Popen("/bin/echo inigo > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
 
 def disable_inigo():
@@ -378,10 +390,12 @@ def main():
     for i in xrange(1, args.n + 1):
         nn = 'h%d' % (i)
         node = net.getNodeByName(nn)
-        node.popen('ethtool -K  %s-eth0 tso off' % (nn), shell=True)
-        node.popen('ethtool -K  %s-eth0 gso off' % (nn), shell=True)
-        node.popen('ethtool -K  %s-eth0 gro off' % (nn), shell=True)
-        node.popen('ethtool -K  %s-eth0 lro off' % (nn), shell=True)
+
+        if args.enable_offload:
+            node.popen('ethtool -K  %s-eth0 tso ufo gso gro lro on' % (nn), shell=True)
+        else:
+            node.popen('ethtool -K  %s-eth0 tso ufo gso gro lro off' % (nn), shell=True)
+
         node.popen("ethtool -k %s-eth0 > %s/ethtool-%s-features.txt" % (nn, args.dir, nn), shell=True)
 
         if args.ecn:
