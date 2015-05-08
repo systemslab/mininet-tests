@@ -3,9 +3,13 @@
 UTIL_DIR=$PWD/../util
 export PATH=$PATH:$UTIL_DIR
 
-# usage: ./run-inigo.sh [<flent experiment>]
+# usage: ./run-inigo.sh <experiment> [<descriptive note>]
 # if a Flent experiment isn't specified, then a simple iperf test is run
+# if a descriptive note (no spaces allowed) isn't given, then a date is used
 if [ -z "$1" ]; then
+  experiment="iperf"
+  exp_opt=""
+elif [ "$1" == "iperf" ]; then
   experiment="iperf"
   exp_opt=""
 else
@@ -13,15 +17,21 @@ else
   exp_opt="--flent $1"
 fi
 
+if [ -z "$2" ]; then
+  note="$(date +%F-%H)"
+else
+  note="$2"
+fi
+
 # different techniques to compare
 # all combinations of tcp, ecn, and aqm are tried
-# limit tcps and *_techs to at most 8 (queue plotting script limit)
+# current queue plotting limit is 8
 #tcps="reno westwood vegas cubic inigo dctcp"
 tcps=${TEST_TCPS:="cubic"}
 #ecn=ecn
 ecn=${TEST_ECN:=""}
-#aqm=fqcodel|cake
-aqm=${TEST_AQM:=""}
+#aqms="fq fqcodel cake"
+aqms=${TEST_AQM:=""}
 
 # list combos for additional interesting plots
 expected_www_techs=${TEST_WWW:=""}
@@ -40,7 +50,7 @@ commonargs="--bw $bw --delay $delay --maxq $maxq -t $t --offset $offset -n $n $e
 
 echo commmonargs: $commonargs
 
-zoodir=$experiment-zoo-n$n-bw$bw-d$delay
+zoodir=$experiment-zoo-$note
 mkdir $zoodir
 
 bz() {
@@ -131,7 +141,7 @@ function runexperiment () {
      allargs="$allargs --${3}"
      tech="${1}+${2}+${3}"
   fi
-  odir=$experiment-$tech-n$n-bw$bw-d$delay
+  odir=$experiment-$tech-$note
   allargs=" --dir $odir $commonargs --${1} $allargs"
 
   mkdir $odir
@@ -151,15 +161,15 @@ for tcp in $tcps; do
     runexperiment ${tcp} ${ecn}
   fi
 
-  if [ "${aqm}" ]; then
+  for aqm in $aqms; do
     echo runexperiment ${tcp} ${aqm}
     runexperiment ${tcp} ${aqm}
-  fi
 
-  if [ "${ecn}" ] && [ "${aqm}" ]; then
-    echo runexperiment ${tcp} ${ecn} ${aqm}
-    runexperiment ${tcp} ${ecn} ${aqm}
-  fi
+    if [ "${ecn}" ]; then
+      echo runexperiment ${tcp} ${ecn} ${aqm}
+      runexperiment ${tcp} ${ecn} ${aqm}
+    fi
+  done
 done
 
 cd $zoodir/qlen_s1-eth1
@@ -182,19 +192,19 @@ if [ "$ecn" ]; then
   mv qlen-cdf.png qlen-cdf-all+${ecn}.png
 fi
 
-if [ "$aqm" ]; then
+for aqm in $aqms; do
   echo plot_queue.R *+${aqm}
   plot_queue.R *+${aqm}
   mv qlen.png qlen-all+${aqm}.png
   mv qlen-cdf.png qlen-cdf-all+${aqm}.png
-fi
 
-if [ "$ecn" ] && [ "$aqm" ]; then
-  echo plot_queue.R *+${ecn}+${aqm}
-  plot_queue.R *+${ecn}+${aqm}
-  mv qlen.png qlen-all+${ecn}+${aqm}.png
-  mv qlen-cdf.png qlen-cdf-all+${ecn}+${aqm}.png
-fi
+  if [ "$ecn" ]; then
+    echo plot_queue.R *+${ecn}+${aqm}
+    plot_queue.R *+${ecn}+${aqm}
+    mv qlen.png qlen-all+${ecn}+${aqm}.png
+    mv qlen-cdf.png qlen-cdf-all+${ecn}+${aqm}.png
+  fi
+done
 
 if [ "$expected_www_techs" ]; then
   echo plot_queue.R $expected_www_techs
