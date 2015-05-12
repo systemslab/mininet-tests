@@ -49,6 +49,11 @@ parser.add_argument('--delay',
 # 10 Mbps
 #	default="1.23ms  0.5ms distribution normal  ")
 
+parser.add_argument('--loss',
+                    dest="loss",
+                    help="loss on switch links. for example 'random 2%' see man tc-netperf for details, default 0%",
+                    default="")
+
 parser.add_argument('--dir', '-d',
                     dest="dir",
                     action="store",
@@ -200,6 +205,12 @@ if args.speedup_bw == -1:
     args.speedup_bw = args.bw
 args.n = max(args.n, 2)
 
+netem_args = "limit {}".format(args.maxq)
+if args.delay != "":
+    netem_args += " delay {}".format(args.delay)
+if args.loss != "":
+    netem_args += " loss {}".format(args.loss)
+
 if not os.path.exists(args.dir):
     os.makedirs(args.dir)
 
@@ -248,7 +259,9 @@ def waitListening(client, server, port):
         raise Exception('Could not find telnet')
     cmd = ('sh -c "echo A | telnet -e A %s %s"' %
            (server.IP(), port))
-    while 'Connected' not in client.cmd(cmd):
+    i = 0
+    while (i < 10) and 'Connected' not in client.cmd(cmd):
+        i += 1
         output('waiting for', server,
                'to listen on port', port, '\n')
         sleep(.5)
@@ -386,43 +399,58 @@ def main():
     else:
         disable_tcp_ecn()
 
+    s1 = net.getNodeByName('s1')
+
     # per node config
     for i in xrange(1, args.n + 1):
         nn = 'h%d' % (i)
         node = net.getNodeByName(nn)
+        #print "configuring node {}".format(nn)
 
         if args.enable_offload:
+            #print "enabling offload"
             node.popen('ethtool -K  %s-eth0 tso ufo gso gro lro on' % (nn), shell=True)
         else:
+            #print "disabling offload"
             node.popen('ethtool -K  %s-eth0 tso ufo gso gro lro off' % (nn), shell=True)
 
         node.popen("ethtool -k %s-eth0 > %s/ethtool-%s-features.txt" % (nn, args.dir, nn), shell=True)
 
         if args.ecn:
+            #print "enabling ecn"
             enable_tcp_ecn(node)
         else:
+            #print "disabling offload"
             disable_tcp_ecn(node)
 
+        #print "removing netem/red qdiscs"
         # we only want red and delay on switches so we can be free to add other qdiscs to hosts
         node.popen("tc qdisc del dev {}-eth0 parent 5:1 red limit 1000000b avpkt 1000".format(node), shell=True).wait()
-        node.popen("tc qdisc del dev {}-eth0 parent 6: netem".format(node), shell=True).wait()
         node.popen("tc qdisc del dev {}-eth0 parent 5:1 netem".format(node), shell=True).wait()
+        node.popen("tc qdisc del dev {}-eth0 parent 6: netem".format(node), shell=True).wait()
+
+        # override mininet's netem settings
+        #print "overriding switch netem settings"
+        s1.popen('tc qdisc change dev s1-eth{} handle 10: netem {}'.format(i, netem_args), shell=True).wait()
 
         if args.constrain_htb:
+            #print "constraining htb"
             constrain_htb(node)
 
         if args.fqcodel:
+            #print "enabling fqcodel"
             enable_fqcodel(node)
 
         if args.cake:
+            #print "enabling cake"
             enable_cake(node)
 
         if args.bw <= 10:
+            #print "setting byte queue limits to 1514"
             node.popen('echo 1514 > /sys/class/net/%s-eth0/queues/tx-0/byte_queue_limits/limit' % (nn), shell=True)
         else:
+            #print "setting byte queue limits to 3000"
             node.popen('echo 3000 > /sys/class/net/%s-eth0/queues/tx-0/byte_queue_limits/limit' % (nn), shell=True)
-
-    s1 = net.getNodeByName('s1')
 
     tech = s1.cmd('cat /proc/sys/net/ipv4/tcp_congestion_control').rstrip('\r\n')
     if args.fqcodel:
@@ -439,16 +467,19 @@ def main():
     if args.debug:
         CLI(net)
 
-    h1 = net.getNodeByName('h1')
-    print h1.cmd('ping -c 2 10.0.0.2')
-
     # extra config check
     print s1.cmd("echo -n 'tcp_congestion_control ' && cat /proc/sys/net/ipv4/tcp_congestion_control")
+    print s1.cmd("echo s1 traffic control && tc qdisc show && tc class show dev s1-eth1")
+
+    h1 = net.getNodeByName('h1')
+    print h1.cmd('ping -i 0.01 -c 100 -q 10.0.0.2')
     print h1.cmd("echo -n 'h1 tcp_ecn ' && cat /proc/sys/net/ipv4/tcp_ecn")
     print h1.cmd("echo h1 traffic control && tc qdisc show && tc class show dev h1-eth0")
+    print h1.cmd("echo h1 byte_queue_limits/limit && cat /sys/class/net/h1-eth0/queues/tx-0/byte_queue_limits/limit")
 
     clients = [net.getNodeByName('h%d' % (i+1)) for i in xrange(1, args.n)]
 
+    print "starting iperf/netperf servers"
     if not args.flent:
         h1.sendCmd('iperf -s -y c -i 1 > {}/iperf_h1.txt'.format(args.dir))
         waitListening(clients[0], h1, 5001)
@@ -475,8 +506,6 @@ def main():
     monitor = multiprocessing.Process(target=monitor_qlen, args=('s1-eth1', 0.01, '%s/qlen_s1-eth1.txt' % (args.dir)))
     monitor.start()
     monitors.append(monitor)
-
-    #CLI(net)
 
     h2 = net.getNodeByName('h2')
     print h2.cmd("echo h2 traffic control && tc qdisc show && tc class show dev h2-eth0")

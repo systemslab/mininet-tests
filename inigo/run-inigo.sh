@@ -30,6 +30,7 @@ best_techs=${TEST_BEST:=""}
 # link properties
 bw=${TEST_BW:=10}
 delay=${TEST_DELAY:="10ms"}	# delay per link, so RTT is 2X
+rtt_us=$((2 * $(echo ${TEST_DELAY} | sed -e 's/ms/000/')))
 t=${TEST_FLOW_DURATION:=30}
 offset=${TEST_FLOW_OFFSET:=10}	# seconds between client starts
 n=${TEST_SIZE:=3}		# 1 server and n-1 clients
@@ -123,6 +124,8 @@ function postprocess () {
 function runexperiment () {
   tech="${1}"
   allargs=""
+
+  # use ecn and/or an aqm?
   if [ "$2" ]; then
      allargs="$allargs --${2}"
      tech="${1}+${2}"
@@ -131,6 +134,7 @@ function runexperiment () {
      allargs="$allargs --${3}"
      tech="${1}+${2}+${3}"
   fi
+
   odir=$experiment-$tech-n$n-bw$bw-d$delay
   allargs=" --dir $odir $commonargs --${1} $allargs"
 
@@ -220,14 +224,14 @@ cd - # end qlen plotting
 
 
 cd $zoodir/tcp_probe_downsampled
-echo plot_tcpprobe.R $tcps
-plot_tcpprobe.R $tcps
+echo plot_tcpprobe_srtt.R $rtt_us $tcps
+plot_tcpprobe_srtt.R $rtt_us $tcps
 mv srtt.png srtt-all-plain.png
 mv srtt-cdf.png srtt-cdf-all-plain.png
 
 for tcp in $tcps; do
-  echo plot_tcpprobe.R ${tcp}*
-  plot_tcpprobe.R ${tcp}*
+  echo plot_tcpprobe_srtt.R $rtt_us ${tcp}*
+  plot_tcpprobe_srtt.R $rtt_us ${tcp}*
   mv srtt.png srtt-all-${tcp}.png
   mv srtt-cdf.png srtt-cdf-all-${tcp}.png
 done
