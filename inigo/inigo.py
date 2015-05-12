@@ -118,7 +118,7 @@ parser.add_argument('--inigo-args',
                     dest="inigo_args",
                     action="store",
                     help="Inigo module args",
-                    default="markthresh=180 dctcp_alpha_on_init=500 rtt_fairness=0 stabilize=0")
+                    default="markthresh=360 dctcp_alpha_on_init=0 rtt_fairness=0 stabilize=0")
 
 parser.add_argument('--reno',
                     dest="reno",
@@ -156,10 +156,16 @@ parser.add_argument('--ecn',
                     help="Enable ECN (net.ipv4.tcp_ecn)",
                     default=False)
 
-parser.add_argument('--constrain-htb',
-                    dest="constrain_htb",
+parser.add_argument('--hostbw',
+                    dest="hostbw",
+                    action="store",
+                    help="Limit bandwidth on clients to X*bw of bottleneck link, 0 < X <= 1.0, default 1.0",
+                    default=1.0)
+
+parser.add_argument('--fq',
+                    dest="fq",
                     action="store_true",
-                    help="Configure a constrained (2 packet qlen and 97% bottleneck bandwidth) on clients",
+                    help="Enable FQ qdisc",
                     default=False)
 
 parser.add_argument('--fqcodel',
@@ -201,6 +207,7 @@ parser.add_argument('--no-tcp-probe',
 args = parser.parse_args()
 args.n = int(args.n)
 args.bw = float(args.bw)
+args.hostbw = float(args.hostbw)
 if args.speedup_bw == -1:
     args.speedup_bw = args.bw
 args.n = max(args.n, 2)
@@ -288,13 +295,19 @@ def disable_tcp_ecn(node=None):
 
     node.popen("sysctl -w net.ipv4.tcp_ecn=0", shell=True).wait()
 
-def constrain_htb(node=None):
+def limit_hostbw(node=None):
     if not node:
         return
 
     node.popen("tc qdisc del dev {}-eth0 root htb".format(node), shell=True).wait()
     node.popen("tc qdisc add dev {}-eth0 root handle 5: htb default 1 direct_qlen 2".format(node), shell=True).wait()
-    node.popen("tc class add dev {}-eth0 parent 5:0 classid 5:1 htb rate {}Mbit burst 3k".format(node, 0.90*args.bw), shell=True).wait()
+    node.popen("tc class add dev {}-eth0 parent 5:0 classid 5:1 htb rate {}Mbit burst 3k".format(node, args.hostbw*args.bw), shell=True).wait()
+
+def enable_fq(node=None):
+    if not node:
+        return
+
+    node.popen("tc qdisc add dev {}-eth0 parent 5:1 handle 10: fq".format(node), shell=True).wait()
 
 def enable_fqcodel(node=None):
     if not node:
@@ -320,7 +333,7 @@ def enable_cake(node=None):
     # outbound
     node.popen("tc qdisc del dev {}-eth0 root htb".format(node), shell=True).wait()
     print "tc qdisc add dev {}-eth0 parent 5:1 handle 10: cake".format(node)
-    node.popen("tc qdisc add dev {}-eth0 root cake bandwidth {}mbit".format(node, 0.90*args.bw), shell=True).wait()
+    node.popen("tc qdisc add dev {}-eth0 root cake bandwidth {}mbit".format(node, args.hostbw*args.bw), shell=True).wait()
 
     # inbound
     node.popen("ip link add name {}-ifb4eth0 type ifb".format(node), shell=True).wait()
@@ -436,6 +449,12 @@ def main():
         if args.constrain_htb:
             #print "constraining htb"
             constrain_htb(node)
+
+        if args.hostbw < 1.0 and not (args.fq or args.fqcodel or args.cake) :
+            limit_hostbw(node)
+
+        if args.fq:
+            enable_fq(node)
 
         if args.fqcodel:
             #print "enabling fqcodel"
