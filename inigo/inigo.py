@@ -144,6 +144,12 @@ parser.add_argument('--cubic',
                     help="Enable CUBIC module",
                     default=False)
 
+parser.add_argument('--cdg',
+                    dest="cdg",
+                    action="store_true",
+                    help="Enable CDG module",
+                    default=False)
+
 parser.add_argument('--enable-offload',
                     dest="enable_offload",
                     action="store_true",
@@ -357,6 +363,9 @@ def enable_westwood():
 def enable_cubic():
     Popen("/bin/echo cubic > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
 
+def enable_cdg():
+    Popen("/bin/echo cdg > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
+
 def enable_dctcp():
     Popen("modprobe tcp_dctcp", shell=True)
     Popen("/bin/echo dctcp > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
@@ -407,6 +416,9 @@ def main():
     if args.cubic:
         enable_cubic()
 
+    if args.cdg:
+        enable_cdg()
+
     if args.ecn:
         enable_tcp_ecn()
     else:
@@ -445,10 +457,6 @@ def main():
         # override mininet's netem settings
         #print "overriding switch netem settings"
         s1.popen('tc qdisc change dev s1-eth{} handle 10: netem {}'.format(i, netem_args), shell=True).wait()
-
-        if args.constrain_htb:
-            #print "constraining htb"
-            constrain_htb(node)
 
         if args.hostbw < 1.0 and not (args.fq or args.fqcodel or args.cake) :
             limit_hostbw(node)
@@ -577,14 +585,16 @@ def main():
 	    args.dir, shell=True)
     net.getNodeByName('h1').pexec("/sbin/tc -s qdisc > %s/tc-stats-h1.txt" %
     	    args.dir, shell=True)
-
     net.getNodeByName('s1').pexec("/sbin/tc -s qdisc > %s/tc-stats-s1.txt" %
     	    args.dir, shell=True)
+
+    Popen("killall -9 cat ping top bwm-ng iperf netserver &> /dev/null", shell=True).wait()
     net.stop()
-    Popen("killall -9 cat ping top bwm-ng netserver &> /dev/null", shell=True).wait()
+    print "net stopped"
 
     enable_cubic()
-    disable_dctcp()
+
+    # rmmod kernel module for development purposes
     disable_inigo()
 
 if __name__ == '__main__':

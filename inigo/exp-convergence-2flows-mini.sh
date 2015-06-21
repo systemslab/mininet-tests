@@ -1,7 +1,7 @@
 #!/bin/bash
 
-export TEST_TCPS="dctcp inigo"
-export TEST_ECN="ecn"
+export TEST_TCPS="cdg inigo"
+#export TEST_ECN="ecn"
 #export TEST_AQM="cake"
 
 #export TEST_WWW="cubic+cake inigo+cake"
@@ -15,6 +15,6 @@ export TEST_FLOW_OFFSET=30
 
 export TEST_SIZE=3
 
-export TEST_EXTRA_ARGS="--loss \"random 2%\""
+#export TEST_EXTRA_ARGS="--loss \"random 2%\""
 
 ./run-inigo.sh

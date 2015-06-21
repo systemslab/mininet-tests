@@ -95,8 +95,8 @@ function postprocess () {
   if [ -f $odir/tcp_probe.txt ]; then
     mkdir $zoodir/tcp_probe_downsampled
     cd $odir
-    echo plot_tcpprobe.R tcp_probe.txt
-    plot_tcpprobe.R tcp_probe.txt
+    echo plot_tcpprobe_srtt.R $rtt_us tcp_probe.txt
+    plot_tcpprobe_srtt.R $rtt_us tcp_probe.txt
     mv srtt.png srtt-${tech}.png
     mv srtt-cdf.png srtt-cdf-${tech}.png
 
@@ -152,7 +152,14 @@ function runexperiment () {
 
   echo sudo python inigo.py $allargs
   sudo bash -c "python inigo.py $allargs 2>&1 | tee -a $odir/experiment.log"
+  #expstatus=$?
+  #if [ $expstatus -lt 1 ]; then
+  #  exit
+  #fi
+
   postprocess $tech $odir
+
+  sudo mn -c
 }
 
 for tcp in $tcps; do
