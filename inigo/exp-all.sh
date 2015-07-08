@@ -1,11 +1,11 @@
 #!/bin/bash
 
-export TEST_TCPS="cubic dctcp inigo"
+export TEST_TCPS="cubic cdg dctcp inigo"
 export TEST_ECN="ecn"
-export TEST_AQM="cake"
+#export TEST_AQM="cake"
 
-export TEST_WWW="cubic+cake inigo inigo+cake"
-export TEST_BEST="cubic+ecn cubic+ecn+cake dctcp+ecn dctcp+ecn+cake inigo inigo+cake inigo+ecn+cake"
+#export TEST_WWW="cubic+cake inigo inigo+cake"
+export TEST_BEST="cubic+ecn cdg cdg+ecn dctcp+ecn inigo inigo+ecn"
 
 export TEST_BW="700"
 export TEST_DELAY="0.25ms"
@@ -18,10 +18,10 @@ export TEST_EXTRA_ARGS="--inigo-args \"markthresh=360 dctcp_alpha_on_init=0 rtt_
 
 export TEST_SIZE=6
 
-./run-inigo.sh iperf convergence-6flows
+./run-inigo.sh iperf convergence-5flows
 
 export TEST_FLOW_OFFSET=0
-export TEST_SIZE=20
+export TEST_SIZE=21
 
 ./run-inigo.sh iperf incast-20flows
 

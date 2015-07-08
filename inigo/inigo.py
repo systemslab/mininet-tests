@@ -425,6 +425,12 @@ def main():
         disable_tcp_ecn()
 
     s1 = net.getNodeByName('s1')
+    # set threshold according to DCTCP's 0.17*BDP rule of thumb
+    # assume delay is in ms, and only added on switch ports
+    bdp = 2 * float(args.delay[:-2]) * args.bw * 1000 / 8
+    K = int(0.17 * bdp)
+    for i in xrange(1, args.n + 1):
+        s1.popen("tc qdisc change dev s1-eth{} handle 6: red limit 1000000b avpkt 1000b min {}b max {}b ecn".format(i, K, K+5000), shell=True).wait()
 
     # per node config
     for i in xrange(1, args.n + 1):
@@ -561,7 +567,7 @@ def main():
             h.sendCmd(cmd)
         else:
             title = "{} {}".format(h, exp_desc)
-            cmd = "netperf-wrapper -H 'h1' -p all_scaled {} -l {} -x --figure-width=8 --figure-height=8 -o {}/{}-{}-{}.png -t '{}'".format(args.flent, seconds, args.dir, args.flent, exp_output, h, title)
+            cmd = "flent -H 10.0.0.1 -p all {} -l {} -d {} -z --figure-width=8 --figure-height=8 -o {}/{}-{}-{}.png -t '{}'".format(args.flent, seconds, offset, args.dir, args.flent, exp_output, h, title)
             print cmd
 	    print "Starting Flent's {} on {}".format(args.flent, h)
 	    if (i+1) != args.n:

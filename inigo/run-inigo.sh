@@ -115,8 +115,16 @@ function postprocess () {
       perl -ne "/10\.0\.0\.$i,/ && /(0\.0-1\.0)|([^0]+\.0-)/ && s/(\d+)\.0-\d+\.0/\$1/ && print" $odir/iperf_h1.txt > $odir/iperf-h$i
     done
     cd $odir
+
     echo plot_iperf.R $bw $offset $(ls iperf-h*)
     plot_iperf.R $bw $offset $(ls iperf-h*)
+    mv iperf.png iperf-${tech}.png
+
+    grep -Ev ",(0.0-[^1])|,(0.0-1[0-9]+)" iperf_h1.txt | sed 's/-/,/' > iperf_h1.txt.fixed
+    echo plot_iperf_stacked.R iperf_h1.txt.fixed
+    plot_iperf_stacked.R iperf_h1.txt.fixed
+    mv iperf-stacked.png iperf-stacked-${tech}.png
+
     cd -
     mv $odir/iperf.png $zoodir/iperf-${tech}.png
   else

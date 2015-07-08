@@ -1,6 +1,7 @@
 #!/bin/bash
 
-export TEST_TCPS="cubic cdg inigo"
+#export TEST_TCPS="cubic cdg inigo"
+export TEST_TCPS="inigo"
 export TEST_ECN="ecn"
 #export TEST_AQM="cake"
 
