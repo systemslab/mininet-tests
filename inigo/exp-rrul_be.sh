@@ -15,4 +15,4 @@ export TEST_FLOW_OFFSET=60
 
 export TEST_SIZE=3
 
-./run-inigo.sh rrul_be
+./run-inigo.sh rrul_be lowbloat

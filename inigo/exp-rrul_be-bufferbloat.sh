@@ -17,4 +17,4 @@ export TEST_SIZE=3
 
 export TEST_EXTRA_ARGS="--maxq 4000"
 
-./run-inigo.sh rrul_be
+./run-inigo.sh rrul_be highbloat

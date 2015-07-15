@@ -17,4 +17,4 @@ export TEST_SIZE=3
 
 export TEST_EXTRA_ARGS=""
 
-./run-inigo.sh
+./run-inigo.sh iperf convergence-2flows

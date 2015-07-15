@@ -2,7 +2,7 @@
 
 #export TEST_TCPS="cubic cdg inigo"
 export TEST_TCPS="inigo"
-export TEST_ECN="ecn"
+#export TEST_ECN="ecn"
 #export TEST_AQM="cake"
 
 #export TEST_WWW="cubic+cake inigo+cake"
@@ -18,4 +18,4 @@ export TEST_SIZE=6
 
 export TEST_EXTRA_ARGS=""
 
-./run-inigo.sh
+./run-inigo.sh iperf convergence-5flows

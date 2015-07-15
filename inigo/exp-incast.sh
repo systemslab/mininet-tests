@@ -17,4 +17,4 @@ export TEST_SIZE=21
 
 export TEST_EXTRA_ARGS=""
 
-./run-inigo.sh
+./run-inigo.sh iperf incast-20flows

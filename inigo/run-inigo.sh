@@ -28,6 +28,7 @@ fi
 # current queue plotting limit is 8
 #tcps="reno westwood vegas cubic inigo dctcp"
 tcps=${TEST_TCPS:="cubic"}
+ntcps=$(echo $tcps | awk -F' ' '{print NF}')
 #ecn=ecn
 ecn=${TEST_ECN:=""}
 #aqms="fq fqcodel cake"
@@ -40,7 +41,7 @@ best_techs=${TEST_BEST:=""}
 # link properties
 bw=${TEST_BW:=10}
 delay=${TEST_DELAY:="10ms"}	# delay per link, so RTT is 2X
-rtt_us=$((2 * $(echo ${TEST_DELAY} | sed -e 's/ms/000/')))
+rtt_us=$(echo ${TEST_DELAY} | perl -ne '/(.*)ms/ && print $1*1000*2')
 t=${TEST_FLOW_DURATION:=30}
 offset=${TEST_FLOW_OFFSET:=10}	# seconds between client starts
 n=${TEST_SIZE:=3}		# 1 server and n-1 clients
@@ -50,6 +51,7 @@ extra_args=${TEST_EXTRA_ARGS:=""}
 commonargs="--bw $bw --delay $delay --maxq $maxq -t $t --offset $offset -n $n $extra_args $exp_opt"
 
 echo commmonargs: $commonargs
+echo rtt_us: $rtt_us
 
 zoodir=$experiment-zoo-$note
 mkdir $zoodir
@@ -100,6 +102,10 @@ function postprocess () {
     mv srtt.png srtt-${tech}.png
     mv srtt-cdf.png srtt-cdf-${tech}.png
 
+    echo plot_tcpprobe_cwnd.R 10.0.0.1 tcp_probe.txt
+    plot_tcpprobe_cwnd.R 10.0.0.1 tcp_probe.txt
+    mv cwnd.png cwnd-${tech}.png
+
     # only keep the downsampled version, since the original grows so big
     downsample tcp_probe.txt ../$zoodir/tcp_probe_downsampled/$tech
     rm tcp_probe.txt
@@ -107,9 +113,6 @@ function postprocess () {
   fi
 
   if [ "$experiment" == "iperf" ]; then
-    echo python $UTIL_DIR/plot_tcpprobe.py -f $zoodir/tcp_probe_downsampled/$tech -o $zoodir/cwnd-${tech}.png
-    python $UTIL_DIR/plot_tcpprobe.py -f $zoodir/tcp_probe_downsampled/$tech -o $zoodir/cwnd-${tech}.png
-  
     # timestamp,saddress,sport,daddress,dport,interval,transferred_bytes,bps
     for i in $(seq 2 $n); do
       perl -ne "/10\.0\.0\.$i,/ && /(0\.0-1\.0)|([^0]+\.0-)/ && s/(\d+)\.0-\d+\.0/\$1/ && print" $odir/iperf_h1.txt > $odir/iperf-h$i
@@ -121,16 +124,16 @@ function postprocess () {
     mv iperf.png iperf-${tech}.png
 
     grep -Ev ",(0.0-[^1])|,(0.0-1[0-9]+)" iperf_h1.txt | sed 's/-/,/' > iperf_h1.txt.fixed
+    for i in $(seq 2 $n); do
+      tshift=$(($offset * ($i - 2)))
+      perl -pi.bak -e "s/(5001,10.0.0.$i,\d+,\d+,)(\d+\.?\d+),/\"\$1\".(\$2 + $tshift).\",\"/e" iperf_h1.txt.fixed
+    done
     echo plot_iperf_stacked.R iperf_h1.txt.fixed
     plot_iperf_stacked.R iperf_h1.txt.fixed
     mv iperf-stacked.png iperf-stacked-${tech}.png
 
     cd -
     mv $odir/iperf.png $zoodir/iperf-${tech}.png
-  else
-    ports=$(perl -ne '/10.0.0.1:(\d+)/ && print "$1\n"' $zoodir/tcp_probe_downsampled/$tech | sort | uniq | tr '\n' ' ')
-    echo python $UTIL_DIR/plot_tcpprobe.py -f $zoodir/tcp_probe_downsampled/$tech -o $zoodir/cwnd-${tech}.png -p $ports
-    python $UTIL_DIR/plot_tcpprobe.py -f $zoodir/tcp_probe_downsampled/$tech -o $zoodir/cwnd-${tech}.png -p $ports
   fi
 
   # move remaining pngs
@@ -196,12 +199,14 @@ plot_queue.R $tcps
 mv qlen.png qlen-all-plain.png
 mv qlen-cdf.png qlen-cdf-all-plain.png
 
-for tcp in $tcps; do
-  echo plot_queue.R ${tcp}*
-  plot_queue.R ${tcp}*
-  mv qlen.png qlen-all-${tcp}.png
-  mv qlen-cdf.png qlen-cdf-all-${tcp}.png
-done
+if [ $ntcps -gt 1 ]; then
+  for tcp in $tcps; do
+    echo plot_queue.R ${tcp}*
+    plot_queue.R ${tcp}*
+    mv qlen.png qlen-all-${tcp}.png
+    mv qlen-cdf.png qlen-cdf-all-${tcp}.png
+  done
+fi
 
 if [ "$ecn" ]; then
   echo plot_queue.R *+${ecn}
@@ -239,7 +244,7 @@ if [ "$best_techs" ]; then
 fi
 
 for tcp in $tcps; do
-  for f in $(ls ${tcp}*); do
+  for f in $(ls ${tcp}* | grep -v bz); do
     bz $f
   done
 done
@@ -248,17 +253,19 @@ cd - # end qlen plotting
 
 
 cd $zoodir/tcp_probe_downsampled
-echo plot_tcpprobe_srtt.R $rtt_us $tcps
-plot_tcpprobe_srtt.R $rtt_us $tcps
-mv srtt.png srtt-all-plain.png
-mv srtt-cdf.png srtt-cdf-all-plain.png
+if [ $ntcps -gt 1 ]; then
+  echo plot_tcpprobe_srtt.R $rtt_us $tcps
+  plot_tcpprobe_srtt.R $rtt_us $tcps
+  mv srtt.png srtt-all-plain.png
+  mv srtt-cdf.png srtt-cdf-all-plain.png
 
-for tcp in $tcps; do
-  echo plot_tcpprobe_srtt.R $rtt_us ${tcp}*
-  plot_tcpprobe_srtt.R $rtt_us ${tcp}*
-  mv srtt.png srtt-all-${tcp}.png
-  mv srtt-cdf.png srtt-cdf-all-${tcp}.png
-done
+  for tcp in $tcps; do
+    echo plot_tcpprobe_srtt.R $rtt_us ${tcp}*
+    plot_tcpprobe_srtt.R $rtt_us ${tcp}*
+    mv srtt.png srtt-all-${tcp}.png
+    mv srtt-cdf.png srtt-cdf-all-${tcp}.png
+  done
+fi
 
 for tcp in $tcps; do
   for f in $(ls ${tcp}*); do
