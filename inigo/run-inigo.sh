@@ -97,17 +97,24 @@ function postprocess () {
   if [ -f $odir/tcp_probe.txt ]; then
     mkdir $zoodir/tcp_probe_downsampled
     cd $odir
-    echo plot_tcpprobe_srtt.R $rtt_us tcp_probe.txt
-    plot_tcpprobe_srtt.R $rtt_us tcp_probe.txt
-    mv srtt.png srtt-${tech}.png
-    mv srtt-cdf.png srtt-cdf-${tech}.png
+    server="10.0.0.1"
+    # separate to/from 10.0.0.1 (also filters out 127.0.0.1, etc.)
+    grep -E "10.0.0.[0-9]+:[0-9]+ ${server}:" tcp_probe.txt > tcp_probe-to-10.0.0.1
+    #grep -E "${server}:[0-9]+ 10.0.0.[0-9]+" tcp_probe.txtinigo > tcp_probe-from-10.0.0.1
 
-    echo plot_tcpprobe_cwnd.R 10.0.0.1 tcp_probe.txt
-    plot_tcpprobe_cwnd.R 10.0.0.1 tcp_probe.txt
-    mv cwnd.png cwnd-${tech}.png
+    echo plot_tcpprobe.R $server $rtt_us tcp_probe-to-10.0.0.1
+    plot_tcpprobe.R $server $rtt_us tcp_probe-to-10.0.0.1
+    mv srtt-${server}.png srtt-${server}-${tech}.png
+    mv srtt-cdf-${server}.png srtt-cdf-${server}-${tech}.png
+    mv cwnd-${server}.png cwnd-${server}-${tech}.png
+    mv cwnd+ssthresh+wnd-${server}.png cwnd+ssthresh+wnd-${server}-${tech}.png
+    mv cwnd+ssthresh-${server}.png cwnd+ssthresh-${server}-${tech}.png
+    mv ssthresh-${server}.png ssthresh-${server}-${tech}.png
+    mv wnd-${server}.png wnd-${server}-${tech}.png
 
     # only keep the downsampled version, since the original grows so big
-    downsample tcp_probe.txt ../$zoodir/tcp_probe_downsampled/$tech
+    downsample tcp_probe-to-10.0.0.1 ../$zoodir/tcp_probe_downsampled/${tech}
+    #downsample tcp_probe-from-10.0.0.1 ../$zoodir/tcp_probe_downsampled/${tech}-from-10.0.0.1
     rm tcp_probe.txt
     cd -
   fi
@@ -251,26 +258,31 @@ done
 mv *png ../
 cd - # end qlen plotting
 
-
 cd $zoodir/tcp_probe_downsampled
 if [ $ntcps -gt 1 ]; then
+  tech="all-plain"
   echo plot_tcpprobe_srtt.R $rtt_us $tcps
   plot_tcpprobe_srtt.R $rtt_us $tcps
-  mv srtt.png srtt-all-plain.png
-  mv srtt-cdf.png srtt-cdf-all-plain.png
+  mv srtt.png srtt-${tech}.png
+  mv srtt-cdf.png srtt-cdf-${tech}.png
 
   for tcp in $tcps; do
-    echo plot_tcpprobe_srtt.R $rtt_us ${tcp}*
-    plot_tcpprobe_srtt.R $rtt_us ${tcp}*
-    mv srtt.png srtt-all-${tcp}.png
-    mv srtt-cdf.png srtt-cdf-all-${tcp}.png
+    if [ $(ls -1 ${tcp}* | wc -l) -gt 1 ]; then
+      tech="all-$tcp"
+      echo plot_tcpprobe_srtt.R $rtt_us ${tcp}*
+      plot_tcpprobe_srtt.R $rtt_us ${tcp}*
+      mv srtt.png srtt-${tech}.png
+      mv srtt-cdf.png srtt-cdf-${tech}.png
+    fi
   done
 fi
 
-for tcp in $tcps; do
-  for f in $(ls ${tcp}*); do
-    bz $f
+if [ $(basename $(pwd)) == "tcp_probe_downsampled" ]; then
+  for tcp in $tcps; do
+    for f in $(ls ${tcp}*); do
+      bz $f
+    done
   done
-done
-mv *png ../
-cd - # end srtt plotting
+  mv *png ../
+fi
+cd - # end tcp_probe plotting

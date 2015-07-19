@@ -523,7 +523,7 @@ def main():
     monitors = []
 
     if not args.no_tcp_probe:
-        Popen("rmmod tcp_probe; modprobe tcp_probe; cat /proc/net/tcpprobe > %s/tcp_probe.txt" % args.dir, shell=True)
+        Popen("rmmod tcp_probe; modprobe tcp_probe full=1; cat /proc/net/tcpprobe > %s/tcp_probe.txt" % args.dir, shell=True)
         print "Waiting for tcp_probe"
         progress(5)
 

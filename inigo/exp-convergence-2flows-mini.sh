@@ -8,7 +8,7 @@ export TEST_TCPS="inigo"
 #export TEST_BEST="cubic+ecn+cake inigo+ecn+cake"
 
 export TEST_BW="700"
-export TEST_DELAY="0.25ms"
+export TEST_DELAY="5ms"
 
 export TEST_FLOW_DURATION=60
 export TEST_FLOW_OFFSET=30
@@ -17,4 +17,4 @@ export TEST_SIZE=3
 
 #export TEST_EXTRA_ARGS="--loss \"random 2%\""
 
-./run-inigo.sh iperf convergence-2flows
+./run-inigo.sh iperf convergence-2flows-mini
