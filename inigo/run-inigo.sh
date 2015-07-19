@@ -82,7 +82,7 @@ function downsample () {
 function postprocess () {
   tech=$1
   odir=$2
-  echo postprocess $tech $odir
+  echo postprocess tech="$tech" odir="$odir"
   user=$(whoami)
 
   sudo chown -R $user $odir
@@ -150,20 +150,26 @@ function postprocess () {
 }
 
 function runexperiment () {
-  tech="${1}"
+  local loc_tcp="${1}"
+  local loc_ecn="${2}"
+  local loc_aqm="${3}"
+  local loc_tech="${1}"
   allargs=""
 
-  # use ecn and/or an aqm?
-  if [ "$2" ]; then
-     allargs="$allargs --${2}"
-     tech="${1}+${2}"
+  eval "$(echo ${1} | perl -ne '/(\w+)\+(\w+)/ && print "loc_tcp=$1; loc_ecn=$2\n"')"
+  eval "$(echo ${1} | perl -ne '/(\w+)\+(\w+)\+(\w+)/ && print "loc_tcp=$1; loc_ecn=$2; loc_aqm=$3\n"')"
+
+  # use loc_ecn and/or an loc_aqm?
+  if [ "$loc_ecn" ]; then
+     allargs="$allargs --${loc_ecn}"
+     loc_tech="${loc_tcp}+${loc_ecn}"
   fi
-  if [ "$3" ]; then
-     allargs="$allargs --${3}"
-     tech="${1}+${2}+${3}"
+  if [ "$loc_aqm" ]; then
+     allargs="$allargs --${loc_aqm}"
+     loc_tech="${loc_tcp}+${loc_ecn}+${loc_aqm}"
   fi
-  odir=$experiment-$tech-$note
-  allargs=" --dir $odir $commonargs --${1} $allargs"
+  odir=$experiment-$loc_tech-$note
+  allargs=" --dir $odir $commonargs --${loc_tcp} $allargs"
 
   mkdir $odir
   touch $odir/experiment.log
@@ -175,7 +181,8 @@ function runexperiment () {
   #  exit
   #fi
 
-  postprocess $tech $odir
+  echo postprocess $loc_tech $odir
+  postprocess $loc_tech $odir
 
   sudo mn -c
 }
@@ -202,14 +209,14 @@ done
 
 cd $zoodir/qlen_s1-eth1
 echo plot_queue.R $tcps
-plot_queue.R $tcps
+plot_queue.R $tcps 2>&1 | tee -a $odir/experiment.log
 mv qlen.png qlen-all-plain.png
 mv qlen-cdf.png qlen-cdf-all-plain.png
 
 if [ $ntcps -gt 1 ]; then
   for tcp in $tcps; do
     echo plot_queue.R ${tcp}*
-    plot_queue.R ${tcp}*
+    plot_queue.R ${tcp}* 2>&1 | tee -a $odir/experiment.log
     mv qlen.png qlen-all-${tcp}.png
     mv qlen-cdf.png qlen-cdf-all-${tcp}.png
   done
@@ -217,20 +224,20 @@ fi
 
 if [ "$ecn" ]; then
   echo plot_queue.R *+${ecn}
-  plot_queue.R *+${ecn}
+  plot_queue.R *+${ecn} 2>&1 | tee -a $odir/experiment.log
   mv qlen.png qlen-all+${ecn}.png
   mv qlen-cdf.png qlen-cdf-all+${ecn}.png
 fi
 
 for aqm in $aqms; do
   echo plot_queue.R *+${aqm}
-  plot_queue.R *+${aqm}
+  plot_queue.R *+${aqm} 2>&1 | tee -a $odir/experiment.log
   mv qlen.png qlen-all+${aqm}.png
   mv qlen-cdf.png qlen-cdf-all+${aqm}.png
 
   if [ "$ecn" ]; then
     echo plot_queue.R *+${ecn}+${aqm}
-    plot_queue.R *+${ecn}+${aqm}
+    plot_queue.R *+${ecn}+${aqm} 2>&1 | tee -a $odir/experiment.log
     mv qlen.png qlen-all+${ecn}+${aqm}.png
     mv qlen-cdf.png qlen-cdf-all+${ecn}+${aqm}.png
   fi
@@ -238,20 +245,20 @@ done
 
 if [ "$expected_www_techs" ]; then
   echo plot_queue.R $expected_www_techs
-  plot_queue.R $expected_www_techs
+  plot_queue.R $expected_www_techs 2>&1 | tee -a $odir/experiment.log
   mv qlen.png qlen-expectedwww.png
   mv qlen-cdf.png qlen-cdf-expectedwww.png
 fi
 
 if [ "$best_techs" ]; then
   echo plot_queue.R $best_techs
-  plot_queue.R $best_techs
+  plot_queue.R $best_techs 2>&1 | tee -a $odir/experiment.log
   mv qlen.png qlen-best.png
   mv qlen-cdf.png qlen-cdf-best.png
 fi
 
 for tcp in $tcps; do
-  for f in $(ls ${tcp}* | grep -v bz); do
+  for f in $(ls ${tcp}* | grep -Ev "bz|.py"); do
     bz $f
   done
 done
@@ -262,7 +269,7 @@ cd $zoodir/tcp_probe_downsampled
 if [ $ntcps -gt 1 ]; then
   tech="all-plain"
   echo plot_tcpprobe_srtt.R $rtt_us $tcps
-  plot_tcpprobe_srtt.R $rtt_us $tcps
+  plot_tcpprobe_srtt.R $rtt_us $tcps 2>&1 | tee -a $odir/experiment.log
   mv srtt.png srtt-${tech}.png
   mv srtt-cdf.png srtt-cdf-${tech}.png
 
@@ -270,7 +277,7 @@ if [ $ntcps -gt 1 ]; then
     if [ $(ls -1 ${tcp}* | wc -l) -gt 1 ]; then
       tech="all-$tcp"
       echo plot_tcpprobe_srtt.R $rtt_us ${tcp}*
-      plot_tcpprobe_srtt.R $rtt_us ${tcp}*
+      plot_tcpprobe_srtt.R $rtt_us ${tcp}* 2>&1 | tee -a $odir/experiment.log
       mv srtt.png srtt-${tech}.png
       mv srtt-cdf.png srtt-cdf-${tech}.png
     fi
@@ -279,7 +286,7 @@ fi
 
 if [ $(basename $(pwd)) == "tcp_probe_downsampled" ]; then
   for tcp in $tcps; do
-    for f in $(ls ${tcp}*); do
+    for f in $(ls ${tcp}* | grep -Ev "bz|.py"); do
       bz $f
     done
   done
