@@ -1,7 +1,8 @@
 #!/bin/bash
 
-#export TEST_TCPS="cdg inigo"
-export TEST_TCPS="inigo"
+export TEST_TCPS="dctcp+hostecn cubic cubic+hostecn cdg cdg+hostecn inigo inigo+hostecn"
+#export TEST_TCPS="dctcp inigo"
+#export TEST_TCPS="dctcp+hostecn cubic+hostecn"
 #export TEST_ECN="ecn"
 #export TEST_AQM="cake"
 

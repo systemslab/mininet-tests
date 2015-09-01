@@ -27,10 +27,22 @@ parser.add_argument('--debug',
                     help="Debug",
                     default=False)
 
+parser.add_argument('--iperf',
+                    dest="iperf",
+                    action="store_true",
+                    help="Execute a basic iperf test",
+                    default=True)
+
 parser.add_argument('--flent',
                     dest="flent",
                     action="store",
                     help="Execute a Flent experiment instead of basic iperf test",
+                    default=None)
+
+parser.add_argument('--sysconfidence',
+                    dest="sysconfidence",
+                    action="store",
+                    help="Execute a System Confidence experiment instead of basic iperf test",
                     default=None)
 
 parser.add_argument('--bw', '-B',
@@ -108,6 +120,12 @@ parser.add_argument('--dctcp',
                     help="Enable DCTCP module",
                     default=False)
 
+parser.add_argument('--dctcpe',
+                    dest="dctcpe",
+                    action="store_true",
+                    help="Enable DCTCPE module",
+                    default=False)
+
 parser.add_argument('--inigo',
                     dest="inigo",
                     action="store_true",
@@ -118,7 +136,13 @@ parser.add_argument('--inigo-args',
                     dest="inigo_args",
                     action="store",
                     help="Inigo module args",
-                    default="markthresh=360 dctcp_alpha_on_init=0 rtt_fairness=0 stabilize=0")
+                    default="")
+
+parser.add_argument('--inigo_rttonly',
+                    dest="inigo_rttonly",
+                    action="store_true",
+                    help="Enable Inigo module",
+                    default=False)
 
 parser.add_argument('--reno',
                     dest="reno",
@@ -150,6 +174,12 @@ parser.add_argument('--cdg',
                     help="Enable CDG module",
                     default=False)
 
+parser.add_argument('--cdg-args',
+                    dest="cdg_args",
+                    action="store",
+                    help="CDG module args",
+                    default="use_tolerance=1")
+
 parser.add_argument('--enable-offload',
                     dest="enable_offload",
                     action="store_true",
@@ -158,6 +188,12 @@ parser.add_argument('--enable-offload',
 
 parser.add_argument('--ecn',
                     dest="ecn",
+                    action="store_true",
+                    help="Enable ECN (net.ipv4.tcp_ecn) and on switch",
+                    default=False)
+
+parser.add_argument('--hostecn',
+                    dest="hostecn",
                     action="store_true",
                     help="Enable ECN (net.ipv4.tcp_ecn)",
                     default=False)
@@ -364,6 +400,7 @@ def enable_cubic():
     Popen("/bin/echo cubic > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
 
 def enable_cdg():
+    Popen("modprobe tcp_cdg {}".format(args.cdg_args), shell=True)
     Popen("/bin/echo cdg > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
 
 def enable_dctcp():
@@ -373,12 +410,26 @@ def enable_dctcp():
 def disable_dctcp():
     Popen("rmmod tcp_dctcp", shell=True).wait()
 
+def enable_dctcpe():
+    Popen("modprobe tcp_dctcpe", shell=True)
+    Popen("/bin/echo dctcpe > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
+
+def disable_dctcpe():
+    Popen("rmmod tcp_dctcpe", shell=True).wait()
+
 def enable_inigo():
     Popen("modprobe tcp_inigo {}".format(args.inigo_args), shell=True)
     Popen("/bin/echo inigo > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
 
 def disable_inigo():
     Popen("rmmod tcp_inigo", shell=True).wait()
+
+def enable_inigo_rttonly():
+    Popen("modprobe tcp_inigo_rttonly {}".format(args.inigo_args), shell=True)
+    Popen("/bin/echo inigo_rttonly > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
+
+def disable_inigo_rttonly():
+    Popen("rmmod tcp_inigo_rttonly", shell=True).wait()
 
 def main():
     seconds = int(args.t)
@@ -399,10 +450,20 @@ def main():
     else:
         disable_dctcp()
 
+    if args.dctcpe:
+        enable_dctcpe()
+    else:
+        disable_dctcpe()
+
     if args.inigo:
         enable_inigo()
     else:
         disable_inigo()
+
+    if args.inigo_rttonly:
+        enable_inigo_rttonly()
+    else:
+        disable_inigo_rttonly()
 
     if args.reno:
         enable_reno()
@@ -419,7 +480,7 @@ def main():
     if args.cdg:
         enable_cdg()
 
-    if args.ecn:
+    if args.ecn or args.hostecn:
         enable_tcp_ecn()
     else:
         disable_tcp_ecn()
@@ -447,7 +508,7 @@ def main():
 
         node.popen("ethtool -k %s-eth0 > %s/ethtool-%s-features.txt" % (nn, args.dir, nn), shell=True)
 
-        if args.ecn:
+        if args.ecn or args.hostecn:
             #print "enabling ecn"
             enable_tcp_ecn(node)
         else:
@@ -492,6 +553,8 @@ def main():
         tech = tech + '+cake'
     if args.ecn:
         tech = tech + '+ecn'
+    if args.hostecn:
+        tech = tech + '+hostecn'
 
     exp_desc="{} Mbps, {} one way delay, tech: {}".format(args.bw, args.delay, tech)
     exp_output="bw{}-d{}-{}".format(args.bw, args.delay, tech)
@@ -513,10 +576,10 @@ def main():
     clients = [net.getNodeByName('h%d' % (i+1)) for i in xrange(1, args.n)]
 
     print "starting iperf/netperf servers"
-    if not args.flent:
+    if args.iperf:
         h1.sendCmd('iperf -s -y c -i 1 > {}/iperf_h1.txt'.format(args.dir))
         waitListening(clients[0], h1, 5001)
-    else:
+    elif args.flent:
         h1.sendCmd('netserver')
         waitListening(clients[0], h1, 12865)
 
@@ -558,14 +621,14 @@ def main():
         node_name = 'h%d' % (i+1)
         h = net.getNodeByName(node_name)
 
-        if not args.flent:
+        if args.iperf:
 	    print "Starting iperf client {}".format(node_name)
             if args.udp:
                 cmd = 'iperf -c 10.0.0.1 -t %d -y c -i 1 -u -b %sM > %s/iperf_%s.txt' % (seconds, args.bw, args.dir, node_name)
             else:
                 cmd = 'iperf -c 10.0.0.1 -t %d -i 1 > %s/iperf_%s.txt' % (seconds, args.dir, node_name)
             h.sendCmd(cmd)
-        else:
+        elif args.flent:
             title = "{} {}".format(h, exp_desc)
             cmd = "flent -H 10.0.0.1 -p all {} -l {} -d {} -z --figure-width=8 --figure-height=8 -o {}/{}-{}-{}.png -t '{}'".format(args.flent, seconds, offset, args.dir, args.flent, exp_output, h, title)
             print cmd
@@ -574,12 +637,20 @@ def main():
                 h.sendCmd(cmd)
             else:
                 h.popen(cmd, shell=True).wait()
+        elif args.sysconfidence:
+            cmd = '/usr/sbin/sshd'
+            h.sendCmd(cmd)
 
 	if (i+1) != args.n:
 	    print "Waiting before starting next client"
             progress(offset)
 
-    if not args.flent:
+    if args.sysconfidence:
+        hostlist = ",".join(["h{}".format(x) for x in xrange(1, args.n)])
+        cmd = 'mpirun -H {} ~mininet/bin/sysconfidence -t net -N mn_{}_B100K_{}'.format(hostlist, args.n, exp_output)
+        h1.popen(cmd, shell=True).wait()
+
+    if args.iperf:
         progress(seconds + 1)
 
     for monitor in monitors:
@@ -602,6 +673,7 @@ def main():
 
     # rmmod kernel module for development purposes
     disable_inigo()
+    disable_inigo_rttonly()
 
 if __name__ == '__main__':
     main()

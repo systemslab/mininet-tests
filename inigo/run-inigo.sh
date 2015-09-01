@@ -185,6 +185,8 @@ function runexperiment () {
   postprocess $loc_tech $odir
 
   sudo mn -c
+
+  sudo dmesg > $odir/dmesg.txt
 }
 
 for tcp in $tcps; do
@@ -207,16 +209,17 @@ for tcp in $tcps; do
   done
 done
 
+touch $zoodir/experiment.log
 cd $zoodir/qlen_s1-eth1
 echo plot_queue.R $tcps
-plot_queue.R $tcps 2>&1 | tee -a $odir/experiment.log
+plot_queue.R $tcps 2>&1 | tee -a ../experiment.log
 mv qlen.png qlen-all-plain.png
 mv qlen-cdf.png qlen-cdf-all-plain.png
 
 if [ $ntcps -gt 1 ]; then
   for tcp in $tcps; do
     echo plot_queue.R ${tcp}*
-    plot_queue.R ${tcp}* 2>&1 | tee -a $odir/experiment.log
+    plot_queue.R ${tcp}* 2>&1 | tee -a ../experiment.log
     mv qlen.png qlen-all-${tcp}.png
     mv qlen-cdf.png qlen-cdf-all-${tcp}.png
   done
@@ -224,20 +227,20 @@ fi
 
 if [ "$ecn" ]; then
   echo plot_queue.R *+${ecn}
-  plot_queue.R *+${ecn} 2>&1 | tee -a $odir/experiment.log
+  plot_queue.R *+${ecn} 2>&1 | tee -a ../experiment.log
   mv qlen.png qlen-all+${ecn}.png
   mv qlen-cdf.png qlen-cdf-all+${ecn}.png
 fi
 
 for aqm in $aqms; do
   echo plot_queue.R *+${aqm}
-  plot_queue.R *+${aqm} 2>&1 | tee -a $odir/experiment.log
+  plot_queue.R *+${aqm} 2>&1 | tee -a ../experiment.log
   mv qlen.png qlen-all+${aqm}.png
   mv qlen-cdf.png qlen-cdf-all+${aqm}.png
 
   if [ "$ecn" ]; then
     echo plot_queue.R *+${ecn}+${aqm}
-    plot_queue.R *+${ecn}+${aqm} 2>&1 | tee -a $odir/experiment.log
+    plot_queue.R *+${ecn}+${aqm} 2>&1 | tee -a ../experiment.log
     mv qlen.png qlen-all+${ecn}+${aqm}.png
     mv qlen-cdf.png qlen-cdf-all+${ecn}+${aqm}.png
   fi
@@ -245,14 +248,14 @@ done
 
 if [ "$expected_www_techs" ]; then
   echo plot_queue.R $expected_www_techs
-  plot_queue.R $expected_www_techs 2>&1 | tee -a $odir/experiment.log
+  plot_queue.R $expected_www_techs 2>&1 | tee -a ../experiment.log
   mv qlen.png qlen-expectedwww.png
   mv qlen-cdf.png qlen-cdf-expectedwww.png
 fi
 
 if [ "$best_techs" ]; then
   echo plot_queue.R $best_techs
-  plot_queue.R $best_techs 2>&1 | tee -a $odir/experiment.log
+  plot_queue.R $best_techs 2>&1 | tee -a ../experiment.log
   mv qlen.png qlen-best.png
   mv qlen-cdf.png qlen-cdf-best.png
 fi
@@ -269,7 +272,7 @@ cd $zoodir/tcp_probe_downsampled
 if [ $ntcps -gt 1 ]; then
   tech="all-plain"
   echo plot_tcpprobe_srtt.R $rtt_us $tcps
-  plot_tcpprobe_srtt.R $rtt_us $tcps 2>&1 | tee -a $odir/experiment.log
+  plot_tcpprobe_srtt.R $rtt_us $tcps 2>&1 | tee -a ../experiment.log
   mv srtt.png srtt-${tech}.png
   mv srtt-cdf.png srtt-cdf-${tech}.png
 
@@ -277,7 +280,7 @@ if [ $ntcps -gt 1 ]; then
     if [ $(ls -1 ${tcp}* | wc -l) -gt 1 ]; then
       tech="all-$tcp"
       echo plot_tcpprobe_srtt.R $rtt_us ${tcp}*
-      plot_tcpprobe_srtt.R $rtt_us ${tcp}* 2>&1 | tee -a $odir/experiment.log
+      plot_tcpprobe_srtt.R $rtt_us ${tcp}* 2>&1 | tee -a ../experiment.log
       mv srtt.png srtt-${tech}.png
       mv srtt-cdf.png srtt-cdf-${tech}.png
     fi
