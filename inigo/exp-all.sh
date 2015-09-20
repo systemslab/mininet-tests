@@ -1,7 +1,8 @@
 #!/bin/bash
 
-export TEST_TCPS="cubic cubic+ecn cdg cdg+ecn reno dctcp+ecn vegas inigo_rttonly inigo_rttonly+ecn inigo inigo+ecn"
-#export TEST_ECN="ecn"
+#export TEST_TCPS="cubic cubic+ecn cdg cdg+ecn reno dctcp+ecn vegas inigo_rttonly inigo_rttonly+ecn inigo inigo+ecn"
+export TEST_TCPS="cubic cdg dctcp vegas inigo_rttonly inigo"
+export TEST_ECN="ecn"
 #export TEST_AQM="cake"
 
 export TEST_WWW="cubic cdg inigo"
@@ -12,7 +13,7 @@ export TEST_DELAY="10ms"
 export TEST_FLOW_DURATION=40
 export TEST_FLOW_OFFSET=20
 export TEST_SIZE=3
-export TEST_EXTRA_ARGS="--inigo-args \"markthresh=300 dctcp_alpha_on_init=0\""
+#export TEST_EXTRA_ARGS="--inigo-args \"markthresh=300 dctcp_alpha_on_init=0\""
 
 ./run-inigo.sh iperf convergence-2flows
 
@@ -28,8 +29,6 @@ export TEST_SIZE=21
 export TEST_TCPS="inigo"
 export TEST_EXTRA_ARGS="--inigo-args \"markthresh=174 dctcp_alpha_on_init=1024\""
 ./run-inigo.sh iperf incast-20flows-conservative
-
-exit
 
 export TEST_TCPS="cubic cdg dctcp inigo"
 export TEST_BW="110"

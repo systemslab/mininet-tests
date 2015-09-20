@@ -33,6 +33,12 @@ parser.add_argument('--iperf',
                     help="Execute a basic iperf test",
                     default=True)
 
+parser.add_argument('--convergence',
+                    dest="convergence",
+                    action="store_true",
+                    help="Execute an iperf test similar to DCTCP's Fig. 16 convergence test",
+                    default=True)
+
 parser.add_argument('--flent',
                     dest="flent",
                     action="store",
@@ -180,10 +186,10 @@ parser.add_argument('--cdg-args',
                     help="CDG module args",
                     default="use_tolerance=1")
 
-parser.add_argument('--enable-offload',
-                    dest="enable_offload",
+parser.add_argument('--disable-offload',
+                    dest="disable_offload",
                     action="store_true",
-                    help="Enable offload support",
+                    help="Disable offload support",
                     default=False)
 
 parser.add_argument('--ecn',
@@ -245,6 +251,12 @@ parser.add_argument('--no-tcp-probe',
                     action="store_true",
                     help="Don't monitor using tcp_probe module (cwnd)",
                     default=False)
+
+parser.add_argument('--rcv-cong',
+                    dest="rcv_cong",
+                    action="store",
+                    help="Enable receiver-based congestion control (0 to disable, 1 for RTT-based threshold, >1 for custom threshold in microseconds)",
+                    default=0)
 
 args = parser.parse_args()
 args.n = int(args.n)
@@ -336,6 +348,20 @@ def disable_tcp_ecn(node=None):
         return
 
     node.popen("sysctl -w net.ipv4.tcp_ecn=0", shell=True).wait()
+
+def enable_rcv_cong(node=None):
+    if not node:
+        Popen("sysctl -w net.ipv4.tcp_rcv_congestion_control={}".format(args.rcv_cong), shell=True).wait()
+        return
+
+    node.popen("sysctl -w net.ipv4.tcp_rcv_congestion_control={}".format(args.rcv_cong), shell=True).wait()
+
+def disable_rcv_cong(node=None):
+    if not node:
+        Popen("sysctl -w net.ipv4.tcp_rcv_congestion_control=0", shell=True).wait()
+        return
+
+    node.popen("sysctl -w net.ipv4.tcp_rcv_congestion_control=0", shell=True).wait()
 
 def limit_hostbw(node=None):
     if not node:
@@ -485,6 +511,11 @@ def main():
     else:
         disable_tcp_ecn()
 
+    if args.rcv_cong:
+        enable_rcv_cong()
+    else:
+        disable_rcv_cong()
+
     s1 = net.getNodeByName('s1')
     # set threshold according to DCTCP's 0.17*BDP rule of thumb
     # assume delay is in ms, and only added on switch ports
@@ -499,20 +530,22 @@ def main():
         node = net.getNodeByName(nn)
         #print "configuring node {}".format(nn)
 
-        if args.enable_offload:
-            #print "enabling offload"
-            node.popen('ethtool -K  %s-eth0 tso ufo gso gro lro on' % (nn), shell=True)
+        if not args.disable_offload:
+            print "%s enabling offload" % nn
+            node.popen('for feature in tso ufo gso gro lro; do ethtool -K  %s-eth0 $feature on; done' % (nn), shell=True).wait()
         else:
-            #print "disabling offload"
-            node.popen('ethtool -K  %s-eth0 tso ufo gso gro lro off' % (nn), shell=True)
+            print "%s disabling offload" % nn
+            #node.popen('for feature in tso ufo gso gro lro; do ethtool -K  %s-eth0 $feature off; done' % (nn), shell=True).wait()
+            node.popen('ethtool -K  %s-eth0 tso off' % (nn), shell=True).wait()
+            node.popen('ethtool -K  %s-eth0 gso off' % (nn), shell=True).wait()
 
         node.popen("ethtool -k %s-eth0 > %s/ethtool-%s-features.txt" % (nn, args.dir, nn), shell=True)
 
         if args.ecn or args.hostecn:
-            #print "enabling ecn"
+            print "%s enabling ecn" % nn
             enable_tcp_ecn(node)
         else:
-            #print "disabling offload"
+            print "%s disabling ecn" % nn
             disable_tcp_ecn(node)
 
         #print "removing netem/red qdiscs"
@@ -575,6 +608,9 @@ def main():
 
     clients = [net.getNodeByName('h%d' % (i+1)) for i in xrange(1, args.n)]
 
+    if args.convergence:
+        args.iperf = True
+
     print "starting iperf/netperf servers"
     if args.iperf:
         h1.sendCmd('iperf -s -y c -i 1 > {}/iperf_h1.txt'.format(args.dir))
@@ -623,10 +659,15 @@ def main():
 
         if args.iperf:
 	    print "Starting iperf client {}".format(node_name)
+            flowtime = seconds
+            if offset > 0 and args.convergence:
+                flowtime = seconds + (args.n - i - 1) * offset * 2
+                print "client {} offset {} flowtime {}".format(i+1, (i+1 - 2)*offset, flowtime)
+
             if args.udp:
-                cmd = 'iperf -c 10.0.0.1 -t %d -y c -i 1 -u -b %sM > %s/iperf_%s.txt' % (seconds, args.bw, args.dir, node_name)
+                cmd = 'iperf -c 10.0.0.1 -t %d -y c -i 1 -u -b %sM > %s/iperf_%s.txt' % (flowtime, args.bw, args.dir, node_name)
             else:
-                cmd = 'iperf -c 10.0.0.1 -t %d -i 1 > %s/iperf_%s.txt' % (seconds, args.dir, node_name)
+                cmd = 'iperf -c 10.0.0.1 -t %d -i 1 > %s/iperf_%s.txt' % (flowtime, args.dir, node_name)
             h.sendCmd(cmd)
         elif args.flent:
             title = "{} {}".format(h, exp_desc)
@@ -651,14 +692,24 @@ def main():
         h1.popen(cmd, shell=True).wait()
 
     if args.iperf:
-        progress(seconds + 1)
+        progress(seconds + (args.n - 3) * offset * 2 + 1)
+
+    for i in xrange(1, args.n):
+        node_name = 'h%d' % (i+1)
+        h = net.getNodeByName(node_name)
+        cmd = "/bin/netstat -s > %s/netstat-%s.txt" % (args.dir, node_name)
+        h.popen(cmd, shell=True)
+        cmd = "/sbin/ifconfig > %s/ifconfig-%s.txt" % (args.dir, node_name)
+        h.popen(cmd, shell=True)
+        cmd = "/sbin/tc > %s/tc-stats-%s.txt" % (args.dir, node_name)
+        h.popen(cmd, shell=True)
 
     for monitor in monitors:
         monitor.terminate()
 
-    net.getNodeByName('h1').pexec("/bin/netstat -s > %s/netstat.txt" %
+    net.getNodeByName('h1').pexec("/bin/netstat -s > %s/netstat-h1.txt" %
 	    args.dir, shell=True)
-    net.getNodeByName('h1').pexec("/sbin/ifconfig > %s/ifconfig.txt" %
+    net.getNodeByName('h1').pexec("/sbin/ifconfig > %s/ifconfig-h1.txt" %
 	    args.dir, shell=True)
     net.getNodeByName('h1').pexec("/sbin/tc -s qdisc > %s/tc-stats-h1.txt" %
     	    args.dir, shell=True)
@@ -674,6 +725,9 @@ def main():
     # rmmod kernel module for development purposes
     disable_inigo()
     disable_inigo_rttonly()
+
+    if args.rcv_cong:
+        disable_rcv_cong()
 
 if __name__ == '__main__':
     main()

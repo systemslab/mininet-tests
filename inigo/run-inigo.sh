@@ -102,15 +102,17 @@ function postprocess () {
     grep -E "10.0.0.[0-9]+:[0-9]+ ${server}:" tcp_probe.txt > tcp_probe-to-10.0.0.1
     #grep -E "${server}:[0-9]+ 10.0.0.[0-9]+" tcp_probe.txtinigo > tcp_probe-from-10.0.0.1
 
-    echo plot_tcpprobe.R $server $rtt_us tcp_probe-to-10.0.0.1
-    plot_tcpprobe.R $server $rtt_us tcp_probe-to-10.0.0.1
-    mv srtt-${server}.png srtt-${server}-${tech}.png
-    mv srtt-cdf-${server}.png srtt-cdf-${server}-${tech}.png
-    mv cwnd-${server}.png cwnd-${server}-${tech}.png
-    mv cwnd+ssthresh+wnd-${server}.png cwnd+ssthresh+wnd-${server}-${tech}.png
-    mv cwnd+ssthresh-${server}.png cwnd+ssthresh-${server}-${tech}.png
-    mv ssthresh-${server}.png ssthresh-${server}-${tech}.png
-    mv wnd-${server}.png wnd-${server}-${tech}.png
+    # doing this for each raw file (pre-downsampled) can take a long time
+    # uncomment if you still want it
+    # echo plot_tcpprobe.R $server $rtt_us tcp_probe-to-10.0.0.1
+    # plot_tcpprobe.R $server $rtt_us tcp_probe-to-10.0.0.1
+    # mv srtt-${server}.png srtt-${server}-${tech}.png
+    # mv srtt-cdf-${server}.png srtt-cdf-${server}-${tech}.png
+    # mv cwnd-${server}.png cwnd-${server}-${tech}.png
+    # mv cwnd+ssthresh+wnd-${server}.png cwnd+ssthresh+wnd-${server}-${tech}.png
+    # mv cwnd+ssthresh-${server}.png cwnd+ssthresh-${server}-${tech}.png
+    # mv ssthresh-${server}.png ssthresh-${server}-${tech}.png
+    # mv wnd-${server}.png wnd-${server}-${tech}.png
 
     # only keep the downsampled version, since the original grows so big
     downsample tcp_probe-to-10.0.0.1 ../$zoodir/tcp_probe_downsampled/${tech}
@@ -211,53 +213,59 @@ done
 
 touch $zoodir/experiment.log
 cd $zoodir/qlen_s1-eth1
-echo plot_queue.R $tcps
-plot_queue.R $tcps 2>&1 | tee -a ../experiment.log
-mv qlen.png qlen-all-plain.png
-mv qlen-cdf.png qlen-cdf-all-plain.png
 
-if [ $ntcps -gt 1 ]; then
-  for tcp in $tcps; do
-    echo plot_queue.R ${tcp}*
-    plot_queue.R ${tcp}* 2>&1 | tee -a ../experiment.log
-    mv qlen.png qlen-all-${tcp}.png
-    mv qlen-cdf.png qlen-cdf-all-${tcp}.png
-  done
-fi
-
-if [ "$ecn" ]; then
-  echo plot_queue.R *+${ecn}
-  plot_queue.R *+${ecn} 2>&1 | tee -a ../experiment.log
-  mv qlen.png qlen-all+${ecn}.png
-  mv qlen-cdf.png qlen-cdf-all+${ecn}.png
-fi
-
-for aqm in $aqms; do
-  echo plot_queue.R *+${aqm}
-  plot_queue.R *+${aqm} 2>&1 | tee -a ../experiment.log
-  mv qlen.png qlen-all+${aqm}.png
-  mv qlen-cdf.png qlen-cdf-all+${aqm}.png
-
-  if [ "$ecn" ]; then
-    echo plot_queue.R *+${ecn}+${aqm}
-    plot_queue.R *+${ecn}+${aqm} 2>&1 | tee -a ../experiment.log
-    mv qlen.png qlen-all+${ecn}+${aqm}.png
-    mv qlen-cdf.png qlen-cdf-all+${ecn}+${aqm}.png
-  fi
+for tcp in $tcps; do
+  echo plot_queue.R ${tcp}*
+  plot_queue.R ${tcp}* 2>&1 | tee -a ../experiment.log
+  mv qlen.png qlen-all-${tcp}.png
+  mv qlen-cdf.png qlen-cdf-all-${tcp}.png
 done
 
-if [ "$expected_www_techs" ]; then
-  echo plot_queue.R $expected_www_techs
-  plot_queue.R $expected_www_techs 2>&1 | tee -a ../experiment.log
-  mv qlen.png qlen-expectedwww.png
-  mv qlen-cdf.png qlen-cdf-expectedwww.png
-fi
+if [ $ntcps -gt 1 ]; then
+  echo plot_queue.R *
+  plot_queue.R * 2>&1 | tee -a ../experiment.log
+  mv qlen.png qlen-all.png
+  mv qlen-cdf.png qlen-cdf-all.png
 
-if [ "$best_techs" ]; then
-  echo plot_queue.R $best_techs
-  plot_queue.R $best_techs 2>&1 | tee -a ../experiment.log
-  mv qlen.png qlen-best.png
-  mv qlen-cdf.png qlen-cdf-best.png
+  echo plot_queue.R $tcps
+  plot_queue.R $tcps 2>&1 | tee -a ../experiment.log
+  mv qlen.png qlen-all-plain.png
+  mv qlen-cdf.png qlen-cdf-all-plain.png
+
+  if [ "$ecn" ]; then
+    echo plot_queue.R *+${ecn}
+    plot_queue.R *+${ecn} 2>&1 | tee -a ../experiment.log
+    mv qlen.png qlen-all+${ecn}.png
+    mv qlen-cdf.png qlen-cdf-all+${ecn}.png
+  fi
+
+  for aqm in $aqms; do
+    echo plot_queue.R *+${aqm}
+    plot_queue.R *+${aqm} 2>&1 | tee -a ../experiment.log
+    mv qlen.png qlen-all+${aqm}.png
+    mv qlen-cdf.png qlen-cdf-all+${aqm}.png
+
+    if [ "$ecn" ]; then
+      echo plot_queue.R *+${ecn}+${aqm}
+      plot_queue.R *+${ecn}+${aqm} 2>&1 | tee -a ../experiment.log
+      mv qlen.png qlen-all+${ecn}+${aqm}.png
+      mv qlen-cdf.png qlen-cdf-all+${ecn}+${aqm}.png
+    fi
+  done
+
+  if [ "$expected_www_techs" ]; then
+    echo plot_queue.R $expected_www_techs
+    plot_queue.R $expected_www_techs 2>&1 | tee -a ../experiment.log
+    mv qlen.png qlen-expectedwww.png
+    mv qlen-cdf.png qlen-cdf-expectedwww.png
+  fi
+
+  if [ "$best_techs" ]; then
+    echo plot_queue.R $best_techs
+    plot_queue.R $best_techs 2>&1 | tee -a ../experiment.log
+    mv qlen.png qlen-best.png
+    mv qlen-cdf.png qlen-cdf-best.png
+  fi
 fi
 
 for tcp in $tcps; do
@@ -270,22 +278,41 @@ cd - # end qlen plotting
 
 cd $zoodir/tcp_probe_downsampled
 if [ $ntcps -gt 1 ]; then
+  tech="all"
+  echo plot_tcpprobe_srtt.R $rtt_us *
+  plot_tcpprobe_srtt.R $rtt_us * 2>&1 | tee -a ../experiment.log
+  mv srtt.png srtt-${tech}.png
+  mv srtt-cdf.png srtt-cdf-${tech}.png
+
   tech="all-plain"
   echo plot_tcpprobe_srtt.R $rtt_us $tcps
   plot_tcpprobe_srtt.R $rtt_us $tcps 2>&1 | tee -a ../experiment.log
   mv srtt.png srtt-${tech}.png
   mv srtt-cdf.png srtt-cdf-${tech}.png
 
-  for tcp in $tcps; do
-    if [ $(ls -1 ${tcp}* | wc -l) -gt 1 ]; then
-      tech="all-$tcp"
-      echo plot_tcpprobe_srtt.R $rtt_us ${tcp}*
-      plot_tcpprobe_srtt.R $rtt_us ${tcp}* 2>&1 | tee -a ../experiment.log
-      mv srtt.png srtt-${tech}.png
-      mv srtt-cdf.png srtt-cdf-${tech}.png
-    fi
-  done
+  if [ "$ecn" ]; then
+    echo plot_queue.R *+${ecn}
+    plot_queue.R *+${ecn} 2>&1 | tee -a ../experiment.log
+    mv qlen.png qlen-all+${ecn}.png
+    mv qlen-cdf.png qlen-cdf-all+${ecn}.png
+
+    tech="all-ecn"
+    echo plot_tcpprobe_srtt.R $rtt_us *+${ecn}
+    plot_tcpprobe_srtt.R $rtt_us *+${ecn} 2>&1 | tee -a ../experiment.log
+    mv srtt.png srtt-${tech}.png
+    mv srtt-cdf.png srtt-cdf-${tech}.png
+  fi
 fi
+
+for tcp in $tcps; do
+  if [ $(ls -1 ${tcp}* | wc -l) -gt 1 ]; then
+    tech="all-$tcp"
+    echo plot_tcpprobe_srtt.R $rtt_us ${tcp}*
+    plot_tcpprobe_srtt.R $rtt_us ${tcp}* 2>&1 | tee -a ../experiment.log
+    mv srtt.png srtt-${tech}.png
+    mv srtt-cdf.png srtt-cdf-${tech}.png
+  fi
+done
 
 if [ $(basename $(pwd)) == "tcp_probe_downsampled" ]; then
   for tcp in $tcps; do
