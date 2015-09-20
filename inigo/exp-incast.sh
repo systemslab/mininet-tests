@@ -2,7 +2,7 @@
 
 #export TEST_TCPS="cubic cdg dctcp+ecn inigo"
 #export TEST_TCPS="cubic cubic+hostecn"
-export TEST_TCPS="inigo"
+export TEST_TCPS="inigo inigo+ecn"
 #export TEST_ECN="ecn"
 #export TEST_AQM="cake"
 

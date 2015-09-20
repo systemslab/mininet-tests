@@ -176,7 +176,7 @@ function runexperiment () {
   mkdir $odir
   touch $odir/experiment.log
 
-  echo sudo python inigo.py $allargs
+  echo sudo python inigo.py $allargs | tee -a $odir/experiment.log
   sudo bash -c "python inigo.py $allargs 2>&1 | tee -a $odir/experiment.log"
   #expstatus=$?
   #if [ $expstatus -lt 1 ]; then
@@ -187,6 +187,9 @@ function runexperiment () {
   postprocess $loc_tech $odir
 
   sudo mn -c
+
+  sudo bash -c "echo cubic > /proc/sys/net/ipv4/tcp_congestion_control"
+  sudo rmmod tcp_inigo
 
   sudo dmesg > $odir/dmesg.txt
 }
@@ -277,31 +280,29 @@ mv *png ../
 cd - # end qlen plotting
 
 cd $zoodir/tcp_probe_downsampled
-if [ $ntcps -gt 1 ]; then
-  tech="all"
-  echo plot_tcpprobe_srtt.R $rtt_us *
-  plot_tcpprobe_srtt.R $rtt_us * 2>&1 | tee -a ../experiment.log
+tech="all"
+echo plot_tcpprobe_srtt.R $rtt_us *
+plot_tcpprobe_srtt.R $rtt_us * 2>&1 | tee -a ../experiment.log
+mv srtt.png srtt-${tech}.png
+mv srtt-cdf.png srtt-cdf-${tech}.png
+
+tech="all-plain"
+echo plot_tcpprobe_srtt.R $rtt_us $tcps
+plot_tcpprobe_srtt.R $rtt_us $tcps 2>&1 | tee -a ../experiment.log
+mv srtt.png srtt-${tech}.png
+mv srtt-cdf.png srtt-cdf-${tech}.png
+
+if [ "$ecn" ]; then
+  echo plot_queue.R *+${ecn}
+  plot_queue.R *+${ecn} 2>&1 | tee -a ../experiment.log
+  mv qlen.png qlen-all+${ecn}.png
+  mv qlen-cdf.png qlen-cdf-all+${ecn}.png
+
+  tech="all-ecn"
+  echo plot_tcpprobe_srtt.R $rtt_us *+${ecn}
+  plot_tcpprobe_srtt.R $rtt_us *+${ecn} 2>&1 | tee -a ../experiment.log
   mv srtt.png srtt-${tech}.png
   mv srtt-cdf.png srtt-cdf-${tech}.png
-
-  tech="all-plain"
-  echo plot_tcpprobe_srtt.R $rtt_us $tcps
-  plot_tcpprobe_srtt.R $rtt_us $tcps 2>&1 | tee -a ../experiment.log
-  mv srtt.png srtt-${tech}.png
-  mv srtt-cdf.png srtt-cdf-${tech}.png
-
-  if [ "$ecn" ]; then
-    echo plot_queue.R *+${ecn}
-    plot_queue.R *+${ecn} 2>&1 | tee -a ../experiment.log
-    mv qlen.png qlen-all+${ecn}.png
-    mv qlen-cdf.png qlen-cdf-all+${ecn}.png
-
-    tech="all-ecn"
-    echo plot_tcpprobe_srtt.R $rtt_us *+${ecn}
-    plot_tcpprobe_srtt.R $rtt_us *+${ecn} 2>&1 | tee -a ../experiment.log
-    mv srtt.png srtt-${tech}.png
-    mv srtt-cdf.png srtt-cdf-${tech}.png
-  fi
 fi
 
 for tcp in $tcps; do

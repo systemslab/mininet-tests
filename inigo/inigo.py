@@ -720,6 +720,7 @@ def main():
     net.stop()
     print "net stopped"
 
+    sleep(2)
     enable_cubic()
 
     # rmmod kernel module for development purposes

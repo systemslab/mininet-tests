@@ -2,10 +2,10 @@
 
 #export TEST_TCPS="dctcp+hostecn cubic cubic+hostecn cdg cdg+hostecn inigo inigo+hostecn"
 #export TEST_TCPS="dctcp+ecn cubic+ecn cdg+ecn inigo inigo+ecn"
-export TEST_TCPS="inigo inigo+ecn"
+#export TEST_TCPS="dctcp+ecn inigo inigo+ecn"
 #export TEST_TCPS="dctcp+hostecn cubic cubic+hostecn inigo"
 #export TEST_TCPS="dctcp inigo"
-#export TEST_TCPS="inigo"
+export TEST_TCPS="inigo"
 #export TEST_TCPS="dctcp+hostecn cubic+hostecn"
 #export TEST_ECN="ecn"
 #export TEST_AQM="cake"
@@ -24,4 +24,19 @@ export TEST_SIZE=6
 #export TEST_EXTRA_ARGS="--convergence --rcv-cong 1"
 #export TEST_EXTRA_ARGS="--rcv-cong 26"
 
-./run-inigo.sh iperf convergence-5flows
+for f in 0 10 13 16 20 23 30; do
+  export TEST_EXTRA_ARGS="--inigo-args \"rtt_fairness=$f\""
+  ./run-inigo.sh iperf convergence-5flows
+  mkdir fairness${f}
+  mv iperf* fairness${f}/
+done
+
+# For use with tso branch of inigo
+#for f in 13 16 20 23; do
+#  for t in 0 1 2; do
+#    export TEST_EXTRA_ARGS="--inigo-args \"rtt_fairness=$f tso_accounting=${t}\""
+#    ./run-inigo.sh iperf convergence-5flows
+#    mkdir fairness${f}tso$t
+#    mv iperf* fairness${f}tso${t}/
+#  done
+#done
