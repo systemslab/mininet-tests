@@ -255,7 +255,25 @@ parser.add_argument('--no-tcp-probe',
 parser.add_argument('--rcv-cong',
                     dest="rcv_cong",
                     action="store",
-                    help="Enable receiver-based congestion control (0 to disable, 1 for RTT-based threshold, >1 for custom threshold in microseconds)",
+                    help="Enable receiver-based congestion control (0 to disable, 1 for RTT-based threshold, >1 for custom threshold %RTT)",
+                    default=0)
+
+parser.add_argument('--rcv-mark',
+                    dest="rcv_mark",
+                    action="store",
+                    help="Enable receiver-based ECN marking",
+                    default=0)
+
+parser.add_argument('--rcv-fairness',
+                    dest="rcv_fairness",
+                    action="store",
+                    help="Adjust receiver's RTT-fairness (0 to disable)",
+                    default=10)
+
+parser.add_argument('--rcv-rebase',
+                    dest="rcv_rebase",
+                    action="store",
+                    help="Rebase receiver's congestion window when RFD total < 0 (0 to disable, 1 to 1024 back off fraction of window)",
                     default=0)
 
 args = parser.parse_args()
@@ -362,6 +380,48 @@ def disable_rcv_cong(node=None):
         return
 
     node.popen("sysctl -w net.ipv4.tcp_rcv_congestion_control=0", shell=True).wait()
+
+def enable_rcv_mark(node=None):
+    if not node:
+        Popen("sysctl -w net.ipv4.tcp_rcv_ecn_marking={}".format(args.rcv_mark), shell=True).wait()
+        return
+
+    node.popen("sysctl -w net.ipv4.tcp_rcv_ecn_marking={}".format(args.rcv_mark), shell=True).wait()
+
+def disable_rcv_mark(node=None):
+    if not node:
+        Popen("sysctl -w net.ipv4.tcp_rcv_ecn_marking=0", shell=True).wait()
+        return
+
+    node.popen("sysctl -w net.ipv4.tcp_rcv_ecn_marking=0", shell=True).wait()
+
+def enable_rcv_fairness(node=None):
+    if not node:
+        Popen("sysctl -w net.ipv4.tcp_rcv_cc_fairness={}".format(args.rcv_fairness), shell=True).wait()
+        return
+
+    node.popen("sysctl -w net.ipv4.tcp_rcv_cc_fairness={}".format(args.rcv_fairness), shell=True).wait()
+
+def disable_rcv_fairness(node=None):
+    if not node:
+        Popen("sysctl -w net.ipv4.tcp_rcv_cc_fairness=0", shell=True).wait()
+        return
+
+    node.popen("sysctl -w net.ipv4.tcp_rcv_cc_fairness=0", shell=True).wait()
+
+def enable_rcv_rebase(node=None):
+    if not node:
+        Popen("sysctl -w net.ipv4.tcp_rcv_cc_rebase={}".format(args.rcv_rebase), shell=True).wait()
+        return
+
+    node.popen("sysctl -w net.ipv4.tcp_rcv_cc_rebase={}".format(args.rcv_rebase), shell=True).wait()
+
+def disable_rcv_rebase(node=None):
+    if not node:
+        Popen("sysctl -w net.ipv4.tcp_rcv_cc_rebase=0", shell=True).wait()
+        return
+
+    node.popen("sysctl -w net.ipv4.tcp_rcv_cc_rebase=0", shell=True).wait()
 
 def limit_hostbw(node=None):
     if not node:
@@ -515,6 +575,21 @@ def main():
         enable_rcv_cong()
     else:
         disable_rcv_cong()
+
+    if args.rcv_mark:
+        enable_rcv_mark()
+    else:
+        disable_rcv_mark()
+
+    if args.rcv_fairness:
+        enable_rcv_fairness()
+    else:
+        disable_rcv_fairness()
+
+    if args.rcv_rebase:
+        enable_rcv_rebase()
+    else:
+        disable_rcv_rebase()
 
     s1 = net.getNodeByName('s1')
     # set threshold according to DCTCP's 0.17*BDP rule of thumb
@@ -726,9 +801,8 @@ def main():
     # rmmod kernel module for development purposes
     disable_inigo()
     disable_inigo_rttonly()
-
-    if args.rcv_cong:
-        disable_rcv_cong()
+    disable_rcv_cong()
+    disable_rcv_mark()
 
 if __name__ == '__main__':
     main()

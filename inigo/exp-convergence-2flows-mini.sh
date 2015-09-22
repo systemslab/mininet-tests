@@ -11,10 +11,10 @@ export TEST_TCPS="inigo"
 #export TEST_WWW="cubic+cake inigo+cake"
 #export TEST_BEST="cubic+ecn+cake inigo+ecn+cake"
 
-export TEST_BW="500"
-export TEST_DELAY="2ms"
+export TEST_BW="400"
+export TEST_DELAY="1ms"
 
-export TEST_FLOW_DURATION=10
+export TEST_FLOW_DURATION=5
 export TEST_FLOW_OFFSET=5
 
 export TEST_SIZE=3
