@@ -21,6 +21,7 @@ import os
 from util.monitor import monitor_cpu, monitor_qlen, monitor_devs_ng
 
 parser = argparse.ArgumentParser(description="Inigo tester (Star topology)")
+# EXAMPLE: sudo python inigo.py --debug -n 3 --bw 100 --delay 10ms -d tmp
 parser.add_argument('--debug',
                     dest="debug",
                     action="store_true",
@@ -125,6 +126,12 @@ parser.add_argument('--dctcp',
                     action="store_true",
                     help="Enable DCTCP module",
                     default=False)
+
+parser.add_argument('--dctcp-args',
+                    dest="dctcp_args",
+                    action="store",
+                    help="DCTCP module args",
+                    default="")
 
 parser.add_argument('--dctcpe',
                     dest="dctcpe",
@@ -289,6 +296,24 @@ if args.delay != "":
     netem_args += " delay {}".format(args.delay)
 if args.loss != "":
     netem_args += " loss {}".format(args.loss)
+
+# calculate threshold according to DCTCP's 0.17*BDP rule of thumb
+# assume delay is in ms, and only added on switch ports
+# delay is OWD and in ms, so multiply by 2 for RTT and 1000 for microseconds
+# bw is in Mbps, so divide by 8 (Mega and micro cancel)
+bdp = 2 * float(args.delay[:-2]) * args.bw * 1000 / 8
+if args.ecn:
+    if args.disable_offload:
+        avpkt=1000
+        burst=5000
+    else:
+        avpkt=65500
+        burst=avpkt
+
+    dctcpK = max(int(0.17 * bdp), avpkt)
+    red_args="limit 1000000b avpkt {} min {}b max {}b ecn".format(avpkt, dctcpK, dctcpK+burst)
+    print "bw={} delay={} bdp={}".format(args.bw, args.delay, bdp)
+    print "red_args={}".format(red_args)
 
 if not os.path.exists(args.dir):
     os.makedirs(args.dir)
@@ -490,7 +515,7 @@ def enable_cdg():
     Popen("/bin/echo cdg > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
 
 def enable_dctcp():
-    Popen("modprobe tcp_dctcp", shell=True)
+    Popen("modprobe tcp_dctcp {}".format(args.dctcp_args), shell=True)
     Popen("/bin/echo dctcp > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
 
 def disable_dctcp():
@@ -592,12 +617,6 @@ def main():
         disable_rcv_rebase()
 
     s1 = net.getNodeByName('s1')
-    # set threshold according to DCTCP's 0.17*BDP rule of thumb
-    # assume delay is in ms, and only added on switch ports
-    bdp = 2 * float(args.delay[:-2]) * args.bw * 1000 / 8
-    K = int(0.17 * bdp)
-    for i in xrange(1, args.n + 1):
-        s1.popen("tc qdisc change dev s1-eth{} handle 6: red limit 1000000b avpkt 1000b min {}b max {}b ecn".format(i, K, K+5000), shell=True).wait()
 
     # per node config
     for i in xrange(1, args.n + 1):
@@ -632,6 +651,14 @@ def main():
         # override mininet's netem settings
         #print "overriding switch netem settings"
         s1.popen('tc qdisc change dev s1-eth{} handle 10: netem {}'.format(i, netem_args), shell=True).wait()
+
+        if args.ecn:
+            # set threshold according to DCTCP's 0.17*BDP rule of thumb
+            cmd="tc qdisc change dev s1-eth{} handle 6: red {}".format(i, red_args)
+            s1.popen(cmd, shell=True).wait()
+            # previous command sometimes clobbers netem
+            cmd="tc qdisc add dev s1-eth{} parent 6: handle 10: netem {}".format(i, netem_args)
+            s1.popen(cmd, shell=True).wait()
 
         if args.hostbw < 1.0 and not (args.fq or args.fqcodel or args.cake) :
             limit_hostbw(node)
