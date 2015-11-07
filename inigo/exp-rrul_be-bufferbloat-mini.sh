@@ -5,7 +5,7 @@ export TEST_ECN="ecn"
 export TEST_AQM="cake"
 
 export TEST_BW="10"
-export TEST_DELAY="10ms"
+export TEST_DELAY="10"
 
 export TEST_FLOW_DURATION=60
 export TEST_FLOW_OFFSET=10

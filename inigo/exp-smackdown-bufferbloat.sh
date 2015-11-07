@@ -8,7 +8,7 @@ export TEST_TCPS="inigo"
 #export TEST_BEST="cubic+ecn+cake dctcp+ecn+cake inigo+ecn+cake"
 
 export TEST_BW="110"
-export TEST_DELAY="13ms"
+export TEST_DELAY="13"
 
 export TEST_FLOW_DURATION=20
 export TEST_FLOW_OFFSET=10

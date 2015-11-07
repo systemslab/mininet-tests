@@ -21,7 +21,7 @@ import os
 from util.monitor import monitor_cpu, monitor_qlen, monitor_devs_ng
 
 parser = argparse.ArgumentParser(description="Inigo tester (Star topology)")
-# EXAMPLE: sudo python inigo.py --debug -n 3 --bw 100 --delay 10ms -d tmp
+# EXAMPLE: sudo python inigo.py --debug -n 3 --bw 100 --delay 10 -d tmp
 parser.add_argument('--debug',
                     dest="debug",
                     action="store_true",
@@ -60,13 +60,19 @@ parser.add_argument('--bw', '-B',
 
 parser.add_argument('--delay',
                     dest="delay",
-                    default="0.123ms  0.05ms distribution normal  ")
+                    help="Delay of each link from switch in milliseconds",
+                    required=True)
 # 1000 Mbps
-#	default="0.012ms  0.001ms distribution normal  ")
+#	default="0.012")
 # 100 Mbps
-#	default="0.123ms  0.05ms distribution normal  ")
+#	default="0.123)
 # 10 Mbps
-#	default="1.23ms  0.5ms distribution normal  ")
+#	default="1.23
+
+parser.add_argument('--delayinc',
+                    dest="delayinc",
+                    help="Increase each link's delay by X ms more than the previous link (RTT fairness testing)",
+                    default="0")
 
 parser.add_argument('--loss',
                     dest="loss",
@@ -289,19 +295,15 @@ args.bw = float(args.bw)
 args.hostbw = float(args.hostbw)
 if args.speedup_bw == -1:
     args.speedup_bw = args.bw
+args.delay = float(args.delay)
+args.delayinc = float(args.delayinc)
 args.n = max(args.n, 2)
-
-netem_args = "limit {}".format(args.maxq)
-if args.delay != "":
-    netem_args += " delay {}".format(args.delay)
-if args.loss != "":
-    netem_args += " loss {}".format(args.loss)
 
 # calculate threshold according to DCTCP's 0.17*BDP rule of thumb
 # assume delay is in ms, and only added on switch ports
 # delay is OWD and in ms, so multiply by 2 for RTT and 1000 for microseconds
 # bw is in Mbps, so divide by 8 (Mega and micro cancel)
-bdp = 2 * float(args.delay[:-2]) * args.bw * 1000 / 8
+bdp = 2 * args.delay * args.bw * 1000 / 8
 if args.ecn:
     if args.disable_offload:
         avpkt=1000
@@ -312,7 +314,7 @@ if args.ecn:
 
     dctcpK = max(int(0.17 * bdp), avpkt)
     red_args="limit 1000000b avpkt {} min {}b max {}b ecn".format(avpkt, dctcpK, dctcpK+burst)
-    print "bw={} delay={} bdp={}".format(args.bw, args.delay, bdp)
+    print "bw={} delay={}ms bdp={}".format(args.bw, args.delay, bdp)
     print "red_args={}".format(red_args)
 
 if not os.path.exists(args.dir):
@@ -339,7 +341,7 @@ class StarTopo(Topo):
         # having on switch egress should be enough. Also, we'll want to test other AQMs on the hosts.
         hconfig = {'cpu': -1}
 	lconfig = {'bw': bw, 
-		   'delay': args.delay,
+		   'delay': '{}ms'.format(args.delay),
 		   'enable_ecn': args.ecn,
 		   'max_queue_size': int(args.maxq),
 		   'use_hfsc': args.use_hfsc,
@@ -650,6 +652,16 @@ def main():
 
         # override mininet's netem settings
         #print "overriding switch netem settings"
+
+        netem_args = "limit {}".format(args.maxq)
+        if args.delay != "":
+            if args.delayinc > 0.0:
+                netem_args += " delay {}ms".format(args.delay + (i-1)*args.delayinc)
+            else:
+                netem_args += " delay {}ms".format(args.delay)
+        if args.loss != "":
+            netem_args += " loss {}".format(args.loss)
+
         s1.popen('tc qdisc change dev s1-eth{} handle 10: netem {}'.format(i, netem_args), shell=True).wait()
 
         if args.ecn:

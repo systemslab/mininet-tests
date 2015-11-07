@@ -40,8 +40,8 @@ best_techs=${TEST_BEST:=""}
 
 # link properties
 bw=${TEST_BW:=10}
-delay=${TEST_DELAY:="10ms"}	# delay per link, so RTT is 2X
-rtt_us=$(echo ${TEST_DELAY} | perl -ne '/(.*)ms/ && print $1*1000*2')
+delay=${TEST_DELAY:="10"}	# delay per link (ms), so RTT is 2X
+rtt_us=$(( ${TEST_DELAY}*1000*2 ))
 t=${TEST_FLOW_DURATION:=30}
 offset=${TEST_FLOW_OFFSET:=10}	# seconds between client starts
 n=${TEST_SIZE:=3}		# 1 server and n-1 clients
@@ -104,15 +104,15 @@ function postprocess () {
 
     # doing this for each raw file (pre-downsampled) can take a long time
     # uncomment if you still want it
-    # echo plot_tcpprobe.R $server $rtt_us tcp_probe-to-10.0.0.1
-    # plot_tcpprobe.R $server $rtt_us tcp_probe-to-10.0.0.1
-    # mv srtt-${server}.png srtt-${server}-${tech}.png
-    # mv srtt-cdf-${server}.png srtt-cdf-${server}-${tech}.png
-    # mv cwnd-${server}.png cwnd-${server}-${tech}.png
-    # mv cwnd+ssthresh+wnd-${server}.png cwnd+ssthresh+wnd-${server}-${tech}.png
-    # mv cwnd+ssthresh-${server}.png cwnd+ssthresh-${server}-${tech}.png
-    # mv ssthresh-${server}.png ssthresh-${server}-${tech}.png
-    # mv wnd-${server}.png wnd-${server}-${tech}.png
+    echo plot_tcpprobe.R $server $rtt_us tcp_probe-to-10.0.0.1
+    plot_tcpprobe.R $server $rtt_us tcp_probe-to-10.0.0.1
+    mv srtt-${server}.png srtt-${server}-${tech}.png
+    mv srtt-cdf-${server}.png srtt-cdf-${server}-${tech}.png
+    mv cwnd-${server}.png cwnd-${server}-${tech}.png
+    mv cwnd+ssthresh+wnd-${server}.png cwnd+ssthresh+wnd-${server}-${tech}.png
+    mv cwnd+ssthresh-${server}.png cwnd+ssthresh-${server}-${tech}.png
+    mv ssthresh-${server}.png ssthresh-${server}-${tech}.png
+    mv wnd-${server}.png wnd-${server}-${tech}.png
 
     # only keep the downsampled version, since the original grows so big
     downsample tcp_probe-to-10.0.0.1 ../$zoodir/tcp_probe_downsampled/${tech}

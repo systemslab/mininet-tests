@@ -16,7 +16,7 @@ export TEST_TCPS="dctcp+ecn"
 #export TEST_BEST="cubic+ecn+cake dctcp+ecn+cake inigo+ecn+cake"
 
 export TEST_BW="500"
-export TEST_DELAY="2ms"
+export TEST_DELAY="2"
 
 export TEST_FLOW_DURATION=5
 export TEST_FLOW_OFFSET=5
@@ -30,7 +30,9 @@ export TEST_SIZE=6
 #exit
 
 # Testing just fairness
-for f in 0 10 20 30 40 50 60; do
+#for f in 10; do
+#for f in 0 10 20 30 40 50 60; do
+for f in 0 10 20; do
   echo check for module 
   lsmod | grep tcp_dctcp
   if [ $? -eq 0 ]; then
@@ -43,7 +45,7 @@ for f in 0 10 20 30 40 50 60; do
     fi
   fi
 
-  export TEST_EXTRA_ARGS="--dctcp-args \"subwnd=$f\""
+  export TEST_EXTRA_ARGS="--dctcp-args \"subwnd=$f\" --delayinc 2"
   ./run-inigo.sh iperf convergence-5flows
   mkdir fairness${f}
   mv iperf* fairness${f}/

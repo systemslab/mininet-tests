@@ -10,7 +10,7 @@ export TEST_WWW="cdg cubic inigo reno"
 export TEST_BEST="cdg+ecn cubic+ecn dctcp+ecn inigo inigo+ecn reno+ecn"
 
 export TEST_BW="500"
-export TEST_DELAY="2ms"
+export TEST_DELAY="2"
 export TEST_FLOW_DURATION=5
 export TEST_FLOW_OFFSET=5
 
@@ -99,7 +99,7 @@ exit
 
 export TEST_TCPS="cubic cdg dctcp+ecn inigo"
 export TEST_BW="110"
-export TEST_DELAY="13ms"
+export TEST_DELAY="13"
 export TEST_FLOW_DURATION=80
 export TEST_FLOW_OFFSET=40
 export TEST_SIZE=3
