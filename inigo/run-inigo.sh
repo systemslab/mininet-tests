@@ -158,6 +158,10 @@ function runexperiment () {
   local loc_tech="${1}"
   allargs=""
 
+  for tcp_mod in $(lsmod | perl -ne '/^(tcp_\w+)/ && print "$1\n"'); do
+      sudo rmmod $tcp_mod
+  done
+
   eval "$(echo ${1} | perl -ne '/(\w+)\+(\w+)/ && print "loc_tcp=$1; loc_ecn=$2\n"')"
   eval "$(echo ${1} | perl -ne '/(\w+)\+(\w+)\+(\w+)/ && print "loc_tcp=$1; loc_ecn=$2; loc_aqm=$3\n"')"
 
@@ -189,7 +193,10 @@ function runexperiment () {
   sudo mn -c
 
   sudo bash -c "echo cubic > /proc/sys/net/ipv4/tcp_congestion_control"
-  sudo rmmod tcp_inigo
+
+  for tcp_mod in $(lsmod | perl -ne '/^(tcp_\w+)/ && print "$1\n"'); do
+      sudo rmmod $tcp_mod
+  done
 
   sudo dmesg > $odir/dmesg.txt
 }

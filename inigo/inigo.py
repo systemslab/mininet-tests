@@ -52,6 +52,12 @@ parser.add_argument('--sysconfidence',
                     help="Execute a System Confidence experiment instead of basic iperf test",
                     default=None)
 
+parser.add_argument('--bottleneck',
+                    dest="bottleneck",
+                    action="store",
+                    help="Limit bandwidth on switch links to X*bw, 0 < X <= 1.0, default 1.0",
+                    default=1.0)
+
 parser.add_argument('--bw', '-B',
                     dest="bw",
                     action="store",
@@ -199,6 +205,12 @@ parser.add_argument('--cdg-args',
                     help="CDG module args",
                     default="use_tolerance=1")
 
+parser.add_argument('--relentless',
+                    dest="relentless",
+                    action="store_true",
+                    help="Enable Relentless module",
+                    default=False)
+
 parser.add_argument('--disable-offload',
                     dest="disable_offload",
                     action="store_true",
@@ -292,6 +304,7 @@ parser.add_argument('--rcv-rebase',
 args = parser.parse_args()
 args.n = int(args.n)
 args.bw = float(args.bw)
+args.bottleneck = float(args.bottleneck)
 args.hostbw = float(args.hostbw)
 if args.speedup_bw == -1:
     args.speedup_bw = args.bw
@@ -303,7 +316,7 @@ args.n = max(args.n, 2)
 # assume delay is in ms, and only added on switch ports
 # delay is OWD and in ms, so multiply by 2 for RTT and 1000 for microseconds
 # bw is in Mbps, so divide by 8 (Mega and micro cancel)
-bdp = 2 * args.delay * args.bw * 1000 / 8
+bdp = 2 * args.delay * args.bottleneck * args.bw * 1000 / 8
 if args.ecn:
     if args.disable_offload:
         avpkt=1000
@@ -314,7 +327,7 @@ if args.ecn:
 
     dctcpK = max(int(0.17 * bdp), avpkt)
     red_args="limit 1000000b avpkt {} min {}b max {}b ecn".format(avpkt, dctcpK, dctcpK+burst)
-    print "bw={} delay={}ms bdp={}".format(args.bw, args.delay, bdp)
+    print "bw={} delay={}ms bdp={}".format(args.bottleneck * args.bw, args.delay, bdp)
     print "red_args={}".format(red_args)
 
 if not os.path.exists(args.dir):
@@ -516,6 +529,12 @@ def enable_cdg():
     Popen("modprobe tcp_cdg {}".format(args.cdg_args), shell=True)
     Popen("/bin/echo cdg > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
 
+def enable_relentless():
+    Popen("/bin/echo relentless > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
+
+def disable_relentless():
+    Popen("rmmod tcp_relentless", shell=True).wait()
+
 def enable_dctcp():
     Popen("modprobe tcp_dctcp {}".format(args.dctcp_args), shell=True)
     Popen("/bin/echo dctcp > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
@@ -548,7 +567,7 @@ def main():
     seconds = int(args.t)
     offset = int(args.offset)
 
-    topo = StarTopo(n=args.n, bw=args.bw)
+    topo = StarTopo(n=args.n, bw=(args.bottleneck * args.bw))
     net = Mininet(topo=topo, host=CPULimitedHost, link=TCLink, switch=Switch,
             controller=OVSController,
 	    autoStaticArp=True)
@@ -559,24 +578,34 @@ def main():
     disable_tcp_ecn() # ensure ECN isn't accidentally left on
 
     if args.dctcp:
+        disable_dctcp()
         enable_dctcp()
     else:
         disable_dctcp()
 
     if args.dctcpe:
+        disable_dctcpe()
         enable_dctcpe()
     else:
         disable_dctcpe()
 
     if args.inigo:
+        disable_inigo()
         enable_inigo()
     else:
         disable_inigo()
 
     if args.inigo_rttonly:
+        disable_inigo_rttonly()
         enable_inigo_rttonly()
     else:
         disable_inigo_rttonly()
+
+    if args.relentless:
+        disable_relentless()
+        enable_relentless()
+    else:
+        disable_relentless()
 
     if args.reno:
         enable_reno()
@@ -838,8 +867,14 @@ def main():
     enable_cubic()
 
     # rmmod kernel module for development purposes
-    disable_inigo()
-    disable_inigo_rttonly()
+    if args.dctcp:
+        disable_dctcp()
+    if args.inigo:
+        disable_inigo()
+    if args.inigo_rttonly:
+        disable_inigo_rttonly()
+    if args.relentless:
+        disable_relentless()
     disable_rcv_cong()
     disable_rcv_mark()
 

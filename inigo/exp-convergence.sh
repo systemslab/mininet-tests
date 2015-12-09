@@ -3,10 +3,16 @@
 #export TEST_TCPS="dctcp+hostecn cubic cubic+hostecn cdg cdg+hostecn inigo inigo+hostecn"
 #export TEST_TCPS="dctcp+ecn cubic+ecn cdg+ecn inigo inigo+ecn"
 #export TEST_TCPS="dctcp+ecn inigo inigo+ecn"
-export TEST_TCPS="dctcp+ecn"
+#export TEST_TCPS="dctcp+ecn"
 #export TEST_TCPS="dctcp+hostecn cubic cubic+hostecn inigo"
 #export TEST_TCPS="dctcp+hostecn cubic+hostecn"
-#export TEST_TCPS="cdg inigo"
+#export TEST_TCPS="cubic+ecn dctcp+ecn relentless inigo cdg"
+#export TEST_TCPS="dctcp+ecn relentless+ecn"
+#export TEST_TCPS="dctcp+ecn relentless+ecn relentless inigo+ecn inigo"
+#export TEST_TCPS="dctcp+ecn relentless+ecn"
+export TEST_TCPS="relentless"
+#export TEST_TCPS="dctcp+ecn inigo+ecn cdg+ecn cubic+ecn cdg cubic"
+#export TEST_TCPS="dctcp+ecn inigo+ecn"
 #export TEST_TCPS="inigo inigo+ecn"
 #export TEST_TCPS="cubic cubic+hostecn dctcp+hostecn"
 #export TEST_ECN="ecn"
@@ -15,8 +21,8 @@ export TEST_TCPS="dctcp+ecn"
 #export TEST_WWW="cubic+cake inigo+cake"
 #export TEST_BEST="cubic+ecn+cake dctcp+ecn+cake inigo+ecn+cake"
 
-export TEST_BW="500"
-export TEST_DELAY="2"
+export TEST_BW="100"
+export TEST_DELAY="10"
 
 export TEST_FLOW_DURATION=5
 export TEST_FLOW_OFFSET=5
@@ -27,7 +33,9 @@ export TEST_SIZE=6
 #export TEST_EXTRA_ARGS="--rcv-cong 1 --rcv-fairness 10"
 #./run-inigo.sh iperf convergence-5flows-rcvcc
 
-#exit
+#export TEST_EXTRA_ARGS="--disable-offload"
+./run-inigo.sh iperf convergence-5flows
+exit
 
 # Testing just fairness
 #for f in 10; do

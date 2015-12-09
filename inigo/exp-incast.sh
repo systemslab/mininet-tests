@@ -2,7 +2,8 @@
 
 #export TEST_TCPS="cubic cdg dctcp+ecn inigo"
 #export TEST_TCPS="cubic cubic+hostecn"
-export TEST_TCPS="inigo inigo+ecn"
+#export TEST_TCPS="inigo inigo+ecn"
+export TEST_TCPS="relentless dctcp+ecn"
 #export TEST_ECN="ecn"
 #export TEST_AQM="cake"
 
@@ -15,7 +16,7 @@ export TEST_DELAY="2"
 export TEST_FLOW_DURATION=5
 export TEST_FLOW_OFFSET=0
 
-export TEST_SIZE=21
+export TEST_SIZE=11
 
 
 # erratic
@@ -39,4 +40,4 @@ export TEST_SIZE=21
 
 #export TEST_EXTRA_ARGS="--rcv-cong 1"
 
-./run-inigo.sh iperf incast-20flows
+./run-inigo.sh iperf incast-${TEST_SIZE}flows
