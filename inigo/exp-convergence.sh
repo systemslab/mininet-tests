@@ -2,7 +2,9 @@
 
 #export TEST_TCPS="dctcp+hostecn cubic cubic+hostecn cdg cdg+hostecn inigo inigo+hostecn"
 #export TEST_TCPS="dctcp+ecn cubic+ecn cdg+ecn inigo inigo+ecn"
-#export TEST_TCPS="dctcp+ecn inigo inigo+ecn"
+#export TEST_TCPS="inigo inigo+ecn"
+#export TEST_TCPS="inigo"
+export TEST_TCPS="reno reno+ecn dctcp dctcp+ecn cubic+ecn cubic cdg+ecn cdg inigo inigo+ecn"
 #export TEST_TCPS="dctcp+ecn"
 #export TEST_TCPS="dctcp+hostecn cubic cubic+hostecn inigo"
 #export TEST_TCPS="dctcp+hostecn cubic+hostecn"
@@ -10,7 +12,7 @@
 #export TEST_TCPS="dctcp+ecn relentless+ecn"
 #export TEST_TCPS="dctcp+ecn relentless+ecn relentless inigo+ecn inigo"
 #export TEST_TCPS="dctcp+ecn relentless+ecn"
-export TEST_TCPS="relentless"
+#export TEST_TCPS="relentless"
 #export TEST_TCPS="dctcp+ecn inigo+ecn cdg+ecn cubic+ecn cdg cubic"
 #export TEST_TCPS="dctcp+ecn inigo+ecn"
 #export TEST_TCPS="inigo inigo+ecn"
@@ -21,8 +23,8 @@ export TEST_TCPS="relentless"
 #export TEST_WWW="cubic+cake inigo+cake"
 #export TEST_BEST="cubic+ecn+cake dctcp+ecn+cake inigo+ecn+cake"
 
-export TEST_BW="100"
-export TEST_DELAY="10"
+export TEST_BW="500"
+export TEST_DELAY="2"
 
 export TEST_FLOW_DURATION=5
 export TEST_FLOW_OFFSET=5

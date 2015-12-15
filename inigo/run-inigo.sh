@@ -108,6 +108,7 @@ function postprocess () {
     plot_tcpprobe.R $server $rtt_us tcp_probe-to-10.0.0.1
     mv srtt-${server}.png srtt-${server}-${tech}.png
     mv srtt-cdf-${server}.png srtt-cdf-${server}-${tech}.png
+    mv srtt-pdf-${server}.png srtt-pdf-${server}-${tech}.png
     mv cwnd-${server}.png cwnd-${server}-${tech}.png
     mv cwnd+ssthresh+wnd-${server}.png cwnd+ssthresh+wnd-${server}-${tech}.png
     mv cwnd+ssthresh-${server}.png cwnd+ssthresh-${server}-${tech}.png

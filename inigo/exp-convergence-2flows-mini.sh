@@ -4,7 +4,8 @@
 #export TEST_TCPS="dctcp+hostecn cubic+hostecn cdg+hostecn inigo+hostecn"
 #export TEST_TCPS="cubic+hostecn"
 #export TEST_TCPS="cubic"
-export TEST_TCPS="dctcp+ecn"
+#export TEST_TCPS="dctcp+ecn"
+export TEST_TCPS="inigo"
 #export TEST_ECN="ecn"
 #export TEST_AQM="cake"
 
@@ -17,7 +18,7 @@ export TEST_DELAY="2"
 export TEST_FLOW_DURATION=4
 export TEST_FLOW_OFFSET=2
 
-export TEST_SIZE=2
+export TEST_SIZE=3
 
 # export TEST_EXTRA_ARGS="--loss \"random 2.5%\""
 

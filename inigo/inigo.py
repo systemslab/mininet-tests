@@ -217,6 +217,12 @@ parser.add_argument('--disable-offload',
                     help="Disable offload support",
                     default=False)
 
+parser.add_argument('--mss',
+                    dest="mss",
+                    action="store",
+                    help="set Maximum Segment Size for iperf",
+                    default=0)
+
 parser.add_argument('--ecn',
                     dest="ecn",
                     action="store_true",
@@ -232,7 +238,7 @@ parser.add_argument('--hostecn',
 parser.add_argument('--hostbw',
                     dest="hostbw",
                     action="store",
-                    help="Limit bandwidth on clients to X*bw of bottleneck link, 0 < X <= 1.0, default 1.0",
+                    help="Set bandwidth on clients to X*bw of bottleneck link, default 1.0",
                     default=1.0)
 
 parser.add_argument('--fq',
@@ -304,6 +310,7 @@ parser.add_argument('--rcv-rebase',
 args = parser.parse_args()
 args.n = int(args.n)
 args.bw = float(args.bw)
+args.mss = int(args.mss)
 args.bottleneck = float(args.bottleneck)
 args.hostbw = float(args.hostbw)
 if args.speedup_bw == -1:
@@ -463,13 +470,14 @@ def disable_rcv_rebase(node=None):
 
     node.popen("sysctl -w net.ipv4.tcp_rcv_cc_rebase=0", shell=True).wait()
 
-def limit_hostbw(node=None):
+def set_hostbw(node=None):
     if not node:
         return
 
     node.popen("tc qdisc del dev {}-eth0 root htb".format(node), shell=True).wait()
-    node.popen("tc qdisc add dev {}-eth0 root handle 5: htb default 1 direct_qlen 2".format(node), shell=True).wait()
-    node.popen("tc class add dev {}-eth0 parent 5:0 classid 5:1 htb rate {}Mbit burst 3k".format(node, args.hostbw*args.bw), shell=True).wait()
+    node.popen("ifconfig {}-eth0 txqueuelen 2".format(node), shell=True).wait()
+    node.popen("tc qdisc add dev {}-eth0 root handle 5: htb default 1".format(node), shell=True).wait()
+    node.popen("tc class add dev {}-eth0 parent 5:0 classid 5:1 htb rate {}Mbit burst 15K".format(node, args.hostbw*args.bw), shell=True).wait()
 
 def enable_fq(node=None):
     if not node:
@@ -648,6 +656,8 @@ def main():
         disable_rcv_rebase()
 
     s1 = net.getNodeByName('s1')
+    h1 = net.getNodeByName('h1')
+    h2 = net.getNodeByName('h2')
 
     # per node config
     for i in xrange(1, args.n + 1):
@@ -701,8 +711,8 @@ def main():
             cmd="tc qdisc add dev s1-eth{} parent 6: handle 10: netem {}".format(i, netem_args)
             s1.popen(cmd, shell=True).wait()
 
-        if args.hostbw < 1.0 and not (args.fq or args.fqcodel or args.cake) :
-            limit_hostbw(node)
+        if args.hostbw > 0.0 and not (args.fq or args.fqcodel or args.cake) :
+            set_hostbw(node)
 
         if args.fq:
             enable_fq(node)
@@ -739,16 +749,6 @@ def main():
     if args.debug:
         CLI(net)
 
-    # extra config check
-    print s1.cmd("echo -n 'tcp_congestion_control ' && cat /proc/sys/net/ipv4/tcp_congestion_control")
-    print s1.cmd("echo s1 traffic control && tc qdisc show && tc class show dev s1-eth1")
-
-    h1 = net.getNodeByName('h1')
-    print h1.cmd('ping -i 0.01 -c 100 -q 10.0.0.2')
-    print h1.cmd("echo -n 'h1 tcp_ecn ' && cat /proc/sys/net/ipv4/tcp_ecn")
-    print h1.cmd("echo h1 traffic control && tc qdisc show && tc class show dev h1-eth0")
-    print h1.cmd("echo h1 byte_queue_limits/limit && cat /sys/class/net/h1-eth0/queues/tx-0/byte_queue_limits/limit")
-
     clients = [net.getNodeByName('h%d' % (i+1)) for i in xrange(1, args.n)]
 
     if args.convergence:
@@ -756,7 +756,11 @@ def main():
 
     print "starting iperf/netperf servers"
     if args.iperf:
-        h1.sendCmd('iperf -s -y c -i 1 > {}/iperf_h1.txt'.format(args.dir))
+        mss = ""
+        if args.mss > 0:
+            mss = "-M {} -m".format(args.mss)
+
+        h1.sendCmd('iperf -s -y c -i 1 {} > {}/iperf_h1.txt'.format(mss, args.dir))
         waitListening(clients[0], h1, 5001)
     elif args.flent:
         h1.sendCmd('netserver')
@@ -782,7 +786,6 @@ def main():
     monitor.start()
     monitors.append(monitor)
 
-    h2 = net.getNodeByName('h2')
     print h2.cmd("echo h2 traffic control && tc qdisc show && tc class show dev h2-eth0")
 
     h2.popen('/bin/ping 10.0.0.1 > %s/ping.txt' % args.dir, shell=True)
@@ -807,10 +810,14 @@ def main():
                 flowtime = seconds + (args.n - i - 1) * offset * 2
                 print "client {} offset {} flowtime {}".format(i+1, (i+1 - 2)*offset, flowtime)
 
+            mss = ""
+            if args.mss > 0:
+                mss = "-M {} -m".format(args.mss)
+
             if args.udp:
-                cmd = 'iperf -c 10.0.0.1 -t %d -y c -i 1 -u -b %sM > %s/iperf_%s.txt' % (flowtime, args.bw, args.dir, node_name)
+                cmd = 'iperf -c 10.0.0.1 -t %d -y c -i 1 %s -u -b %sM > %s/iperf_%s.txt' % (flowtime, mss, args.bw, args.dir, node_name)
             else:
-                cmd = 'iperf -c 10.0.0.1 -t %d -i 1 > %s/iperf_%s.txt' % (flowtime, args.dir, node_name)
+                cmd = 'iperf -c 10.0.0.1 -t %d -i 1 %s > %s/iperf_%s.txt' % (flowtime, mss, args.dir, node_name)
             h.sendCmd(cmd)
         elif args.flent:
             title = "{} {}".format(h, exp_desc)
@@ -854,10 +861,18 @@ def main():
 	    args.dir, shell=True)
     net.getNodeByName('h1').pexec("/sbin/ifconfig > %s/ifconfig-h1.txt" %
 	    args.dir, shell=True)
-    net.getNodeByName('h1').pexec("/sbin/tc -s qdisc > %s/tc-stats-h1.txt" %
-    	    args.dir, shell=True)
-    net.getNodeByName('s1').pexec("/sbin/tc -s qdisc > %s/tc-stats-s1.txt" %
-    	    args.dir, shell=True)
+
+    # config check
+#    print s1.cmd("echo -n 'tcp_congestion_control ' && cat /proc/sys/net/ipv4/tcp_congestion_control")
+#    print s1.cmd("echo s1 traffic control config && tc qdisc show && tc class show dev s1-eth1")
+#    print s1.cmd("echo s1 traffic control stats && tc -s qdisc && tc -s class")
+#
+#    print h1.cmd('ping -i 0.01 -c 100 -q 10.0.0.2')
+#    print h1.cmd("echo -n 'h1 tcp_ecn ' && cat /proc/sys/net/ipv4/tcp_ecn")
+#    print h1.cmd("echo h1 traffic control && tc qdisc show && tc class show dev h1-eth0")
+#    print h1.cmd("echo h1 traffic control stats && tc -s qdisc && tc -s class")
+#    print h1.cmd("echo h1 byte_queue_limits/limit && cat /sys/class/net/h1-eth0/queues/tx-0/byte_queue_limits/limit")
+#    print h1.cmd("echo h1 ifconfig && ifconfig h1-eth0")
 
     Popen("killall -9 cat ping top bwm-ng iperf netserver &> /dev/null", shell=True).wait()
     net.stop()
