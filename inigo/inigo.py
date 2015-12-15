@@ -238,8 +238,8 @@ parser.add_argument('--hostecn',
 parser.add_argument('--hostbw',
                     dest="hostbw",
                     action="store",
-                    help="Set bandwidth on clients to X*bw of bottleneck link, default 1.0",
-                    default=1.0)
+                    help="Set bandwidth on clients to X*bw of bottleneck link, default 0, means unlimited",
+                    default=0)
 
 parser.add_argument('--fq',
                     dest="fq",
