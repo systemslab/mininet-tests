@@ -15,36 +15,36 @@ export TEST_FLOW_DURATION=5
 export TEST_FLOW_OFFSET=5
 
 #export TEST_SIZE=3
-#./run-inigo.sh iperf convergence-2flows
+#./run-experiment.sh iperf convergence-2flows
 
 # export TEST_SIZE=6
-# ./run-inigo.sh iperf convergence-5flows
+# ./run-experiment.sh iperf convergence-5flows
 # 
 # export TEST_SIZE=21
 # export TEST_FLOW_OFFSET=0
-# ./run-inigo.sh iperf incast-20flows
+# ./run-experiment.sh iperf incast-20flows
 
 # export TEST_TCPS="inigo inigo+ecn"
 # export TEST_EXTRA_ARGS="--inigo-args \"rtt_fairness=0\""
 # unset TEST_WWW
 # unset TEST_BEST
 # export TEST_SIZE=6
-# ./run-inigo.sh iperf convergence-5flows-fairness0
+# ./run-experiment.sh iperf convergence-5flows-fairness0
 # export TEST_FLOW_OFFSET=0
 # export TEST_SIZE=21
-# ./run-inigo.sh iperf incast-20flows-fairness0
+# ./run-experiment.sh iperf incast-20flows-fairness0
 
 # export TEST_FLOW_DURATION=5
 # export TEST_FLOW_OFFSET=5
 # export TEST_SIZE=6
 # export TEST_TCPS="cdg cubic inigo reno"
 # export TEST_EXTRA_ARGS="--rcv-cong 1"
-# ./run-inigo.sh iperf convergence-5flows-rcvcc
+# ./run-experiment.sh iperf convergence-5flows-rcvcc
 # 
 # export TEST_FLOW_OFFSET=0
 # export TEST_SIZE=21
 # 
-# ./run-inigo.sh iperf incast-20flows-rcvcc
+# ./run-experiment.sh iperf incast-20flows-rcvcc
 
 export TEST_FLOW_DURATION=5
 export TEST_FLOW_OFFSET=5
@@ -52,36 +52,36 @@ export TEST_SIZE=6
 export TEST_TCPS="cdg+hostecn cubic+hostecn dctcp+hostecn inigo+hostecn reno+hostecn"
 export TEST_EXTRA_ARGS="--rcv-mark 1"
 
-./run-inigo.sh iperf convergence-5flows-rcvecn
+./run-experiment.sh iperf convergence-5flows-rcvecn
 
 export TEST_FLOW_OFFSET=0
 export TEST_SIZE=21
 
-./run-inigo.sh iperf incast-20flows-rcvecn
+./run-experiment.sh iperf incast-20flows-rcvecn
 
 export TEST_FLOW_DURATION=5
 export TEST_FLOW_OFFSET=5
 export TEST_SIZE=6
 export TEST_TCPS="cdg cubic inigo reno cdg+hostecn cubic+hostecn dctcp+hostecn inigo+hostecn reno+hostecn"
 export TEST_EXTRA_ARGS="--rcv-cong 1 --rcv-mark 1"
-./run-inigo.sh iperf convergence-5flows-rcvboth
+./run-experiment.sh iperf convergence-5flows-rcvboth
 
 export TEST_FLOW_OFFSET=0
 export TEST_SIZE=21
 
-./run-inigo.sh iperf incast-20flows-rcvboth
+./run-experiment.sh iperf incast-20flows-rcvboth
 
 export TEST_FLOW_DURATION=5
 export TEST_FLOW_OFFSET=5
 export TEST_SIZE=6
 export TEST_TCPS="cdg cubic inigo reno cdg+hostecn cubic+hostecn dctcp+hostecn inigo+hostecn reno+hostecn"
 export TEST_EXTRA_ARGS="--rcv-cong 1 --rcv-mark 1 --rcv-rebase 512"
-./run-inigo.sh iperf convergence-5flows-rcv-rebase
+./run-experiment.sh iperf convergence-5flows-rcv-rebase
 
 export TEST_FLOW_OFFSET=0
 export TEST_SIZE=21
 
-./run-inigo.sh iperf incast-20flows-rcv-rebase
+./run-experiment.sh iperf incast-20flows-rcv-rebase
 
 # #export TEST_TCPS="inigo inigo+ecn"
 # export TEST_TCPS="inigo"
@@ -89,10 +89,10 @@ export TEST_SIZE=21
 # unset TEST_WWW
 # unset TEST_BEST
 # export TEST_SIZE=6
-# ./run-inigo.sh iperf convergence-5flows-rcvcc-fairness0
+# ./run-experiment.sh iperf convergence-5flows-rcvcc-fairness0
 # export TEST_FLOW_OFFSET=0
 # export TEST_SIZE=21
-# ./run-inigo.sh iperf incast-20flows-rcvcc-fairness0
+# ./run-experiment.sh iperf incast-20flows-rcvcc-fairness0
 
 exit
 # need to get flent working again
@@ -104,16 +104,16 @@ export TEST_FLOW_DURATION=80
 export TEST_FLOW_OFFSET=40
 export TEST_SIZE=3
 
-# ./run-inigo.sh rrul_be lowbloat
+# ./run-experiment.sh rrul_be lowbloat
 
 export TEST_EXTRA_ARGS="--maxq 4000"
 
-./run-inigo.sh rrul_be highbloat
+./run-experiment.sh rrul_be highbloat
 
 export TEST_EXTRA_ARGS="--maxq 4000 --hostbw 0.90"
 
-./run-inigo.sh rrul_be highbloat-throttled
+./run-experiment.sh rrul_be highbloat-throttled
 
 export TEST_TCPS="inigo"
 export TEST_EXTRA_ARGS="--maxq 4000"
-./run-inigo.sh reno_cubic_cdg_inigo highbloat
+./run-experiment.sh reno_cubic_cdg_inigo highbloat

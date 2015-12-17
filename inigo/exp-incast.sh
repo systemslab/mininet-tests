@@ -40,4 +40,4 @@ export TEST_SIZE=11
 
 #export TEST_EXTRA_ARGS="--rcv-cong 1"
 
-./run-inigo.sh iperf incast-${TEST_SIZE}flows
+./run-experiment.sh iperf incast-${TEST_SIZE}flows

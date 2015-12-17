@@ -17,4 +17,4 @@ export TEST_SIZE=2
 
 export TEST_EXTRA_ARGS="--hostbw 5.0 --maxq 100"
 
-./run-inigo.sh iperf ns3
+./run-experiment.sh iperf ns3

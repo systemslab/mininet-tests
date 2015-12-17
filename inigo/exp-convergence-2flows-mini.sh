@@ -27,4 +27,4 @@ export TEST_SIZE=3
 
 #export TEST_EXTRA_ARGS="--inigo-args \"slowstart_rtt_observations_needed=8 ssmarkthresh=125 markthresh=174 minor_congestion=0 major_congestion=990 dctcp_alpha_on_init=0 persistent_congestion=10 rtt_fairness=20\""
 
-./run-inigo.sh iperf convergence-2flows-mini
+./run-experiment.sh iperf convergence-2flows-mini

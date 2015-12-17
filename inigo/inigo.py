@@ -403,16 +403,24 @@ def progress(t):
 def enable_tcp_ecn(node=None):
     if not node:
         Popen("sysctl -w net.ipv4.tcp_ecn=1", shell=True).wait()
+        result = check_output(['cat', '/proc/sys/net/ipv4/tcp_ecn'])
+        print "system ecn = {}".format(result)
         return
 
     node.popen("sysctl -w net.ipv4.tcp_ecn=1", shell=True).wait()
+    result = node.cmd('cat /proc/sys/net/ipv4/tcp_ecn').rstrip('\r\n')
+    print "{} ecn = {}".format(node, result)
 
 def disable_tcp_ecn(node=None):
     if not node:
         Popen("sysctl -w net.ipv4.tcp_ecn=0", shell=True).wait()
+        result = check_output(['cat', '/proc/sys/net/ipv4/tcp_ecn'])
+        print "system ecn = {}".format(result)
         return
 
     node.popen("sysctl -w net.ipv4.tcp_ecn=0", shell=True).wait()
+    result = node.cmd('cat /proc/sys/net/ipv4/tcp_ecn').rstrip('\r\n')
+    print "{} ecn = {}".format(node, result)
 
 def enable_rcv_cong(node=None):
     if not node:
@@ -544,7 +552,11 @@ def disable_relentless():
     Popen("rmmod tcp_relentless", shell=True).wait()
 
 def enable_dctcp():
-    Popen("modprobe tcp_dctcp {}".format(args.dctcp_args), shell=True)
+    force_ecn = ""
+    if args.ecn or args.hostecn:
+        force_ecn = "dctcp_force_ecn=1"
+
+    Popen("modprobe tcp_dctcp {} {}".format(force_ecn, args.dctcp_args), shell=True)
     Popen("/bin/echo dctcp > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
 
 def disable_dctcp():
@@ -558,7 +570,11 @@ def disable_dctcpe():
     Popen("rmmod tcp_dctcpe", shell=True).wait()
 
 def enable_inigo():
-    Popen("modprobe tcp_inigo {}".format(args.inigo_args), shell=True)
+    force_ecn = ""
+    if args.ecn or args.hostecn:
+        force_ecn = "inigo_force_ecn=1"
+
+    Popen("modprobe tcp_inigo {} {}".format(force_ecn, args.inigo_args), shell=True)
     Popen("/bin/echo inigo > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
 
 def disable_inigo():
@@ -677,10 +693,8 @@ def main():
         node.popen("ethtool -k %s-eth0 > %s/ethtool-%s-features.txt" % (nn, args.dir, nn), shell=True)
 
         if args.ecn or args.hostecn:
-            print "%s enabling ecn" % nn
             enable_tcp_ecn(node)
         else:
-            print "%s disabling ecn" % nn
             disable_tcp_ecn(node)
 
         #print "removing netem/red qdiscs"

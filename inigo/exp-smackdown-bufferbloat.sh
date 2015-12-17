@@ -17,4 +17,4 @@ export TEST_SIZE=2
 
 export TEST_EXTRA_ARGS="--maxq 4000"
 
-./run-inigo.sh reno_cubic_westwood_inigo highbloat-smackdown
+./run-experiment.sh reno_cubic_westwood_inigo highbloat-smackdown
