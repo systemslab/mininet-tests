@@ -122,16 +122,16 @@ postprocess () {
 
     # doing this for each raw file (pre-downsampled) can take a long time
     # uncomment if you still want it
-#    echo plot_tcpprobe.R $server $rtt_us tcp_probe-to-10.0.0.1
-#    plot_tcpprobe.R $server $rtt_us tcp_probe-to-10.0.0.1
-#    mv srtt-${server}.png srtt-${server}-${tech}.png &> /dev/null
-#    mv srtt-cdf-${server}.png srtt-cdf-${server}-${tech}.png &> /dev/null
-#    mv srtt-pdf-${server}.png srtt-pdf-${server}-${tech}.png &> /dev/null
-#    mv cwnd-${server}.png cwnd-${server}-${tech}.png &> /dev/null
-#    mv cwnd+ssthresh+wnd-${server}.png cwnd+ssthresh+wnd-${server}-${tech}.png &> /dev/null
-#    mv cwnd+ssthresh-${server}.png cwnd+ssthresh-${server}-${tech}.png &> /dev/null
-#    mv ssthresh-${server}.png ssthresh-${server}-${tech}.png &> /dev/null
-#    mv wnd-${server}.png wnd-${server}-${tech}.png &> /dev/null
+    echo plot_tcpprobe.R $server $rtt_us tcp_probe-to-10.0.0.1
+    plot_tcpprobe.R $server $rtt_us tcp_probe-to-10.0.0.1
+    mv srtt-${server}.png srtt-${server}-${tech}.png &> /dev/null
+    mv srtt-cdf-${server}.png srtt-cdf-${server}-${tech}.png &> /dev/null
+    mv srtt-pdf-${server}.png srtt-pdf-${server}-${tech}.png &> /dev/null
+    mv cwnd-${server}.png cwnd-${server}-${tech}.png &> /dev/null
+    mv cwnd+ssthresh+wnd-${server}.png cwnd+ssthresh+wnd-${server}-${tech}.png &> /dev/null
+    mv cwnd+ssthresh-${server}.png cwnd+ssthresh-${server}-${tech}.png &> /dev/null
+    mv ssthresh-${server}.png ssthresh-${server}-${tech}.png &> /dev/null
+    mv wnd-${server}.png wnd-${server}-${tech}.png &> /dev/null
 
     # only keep the downsampled version, since the original grows so big
     downsample tcp_probe-to-10.0.0.1 ../$graphdir/srtt/${tech}
@@ -178,7 +178,8 @@ postprocess () {
   # move remaining pngs
   mv $odir/*.png $graphdir/ &> /dev/null
 
-  [ -f $odir/h1_tcpdump.pcap ] && bz $odir/h1_tcpdump.pcap
+  # use gzip for pcap since wireshark understands that, but not other compression
+  [ -f $odir/h1_tcpdump.pcap ] && gzip $odir/h1_tcpdump.pcap
 }
 
 for tcp in $tcps; do

@@ -226,7 +226,13 @@ parser.add_argument('--mss',
 parser.add_argument('--ecn',
                     dest="ecn",
                     action="store_true",
-                    help="Enable ECN (net.ipv4.tcp_ecn) and on switch",
+                    help="Enable ECN (net.ipv4.tcp_ecn) hosts and DCTCP-style ECN marking on switches",
+                    default=False)
+
+parser.add_argument('--switchecn',
+                    dest="switchecn",
+                    action="store_true",
+                    help="Enable DCTCP-style ECN marking on switches",
                     default=False)
 
 parser.add_argument('--hostecn',
@@ -289,6 +295,12 @@ parser.add_argument('--rcv-cong',
                     help="Enable receiver-based congestion control (0 to disable, 1 for RTT-based threshold, >1 for custom threshold %RTT)",
                     default=0)
 
+parser.add_argument('--rcv-dctcp',
+                    dest="rcv_dctcp",
+                    action="store",
+                    help="Enable receiver-based dctcp",
+                    default=0)
+
 parser.add_argument('--rcv-mark',
                     dest="rcv_mark",
                     action="store",
@@ -307,6 +319,12 @@ parser.add_argument('--rcv-rebase',
                     help="Rebase receiver's congestion window when RFD total < 0 (0 to disable, 1 to 1024 back off fraction of window)",
                     default=0)
 
+parser.add_argument('--tcp-us-tstamp',
+                    dest="tcp_us_tstamp",
+                    action="store_true",
+                    help="enable microsecond resolution TCP timestamps (default ms)",
+                    default=False)
+
 args = parser.parse_args()
 args.n = int(args.n)
 args.bw = float(args.bw)
@@ -324,7 +342,7 @@ args.n = max(args.n, 2)
 # delay is OWD and in ms, so multiply by 2 for RTT and 1000 for microseconds
 # bw is in Mbps, so divide by 8 (Mega and micro cancel)
 bdp = 2 * args.delay * args.bottleneck * args.bw * 1000 / 8
-if args.ecn:
+if args.ecn or args.switchecn:
     if args.disable_offload:
         avpkt=1000
         burst=5000
@@ -362,7 +380,7 @@ class StarTopo(Topo):
         hconfig = {'cpu': -1}
 	lconfig = {'bw': bw, 
 		   'delay': '{}ms'.format(args.delay),
-		   'enable_ecn': args.ecn,
+		   'enable_ecn': args.ecn or args.switchecn,
 		   'max_queue_size': int(args.maxq),
 		   'use_hfsc': args.use_hfsc,
 		   'speedup': float(args.speedup_bw)
@@ -388,8 +406,7 @@ def waitListening(client, server, port):
     i = 0
     while (i < 10) and 'Connected' not in client.cmd(cmd):
         i += 1
-        output('waiting for', server,
-               'to listen on port', port, '\n')
+        output('waiting for', server, 'to listen on port', port, '\n')
         sleep(.5)
 
 def progress(t):
@@ -436,6 +453,20 @@ def disable_rcv_cong(node=None):
 
     node.popen("sysctl -w net.ipv4.tcp_rcv_congestion_control=0", shell=True).wait()
 
+def enable_rcv_dctcp(node=None):
+    if not node:
+        Popen("sysctl -w net.ipv4.tcp_rcv_dctcp={}".format(args.rcv_dctcp), shell=True).wait()
+        return
+
+    node.popen("sysctl -w net.ipv4.tcp_rcv_dctcp={}".format(args.rcv_dctcp), shell=True).wait()
+
+def disable_rcv_dctcp(node=None):
+    if not node:
+        Popen("sysctl -w net.ipv4.tcp_rcv_dctcp=0", shell=True).wait()
+        return
+
+    node.popen("sysctl -w net.ipv4.tcp_rcv_dctcp=0", shell=True).wait()
+
 def enable_rcv_mark(node=None):
     if not node:
         Popen("sysctl -w net.ipv4.tcp_rcv_ecn_marking={}".format(args.rcv_mark), shell=True).wait()
@@ -450,19 +481,12 @@ def disable_rcv_mark(node=None):
 
     node.popen("sysctl -w net.ipv4.tcp_rcv_ecn_marking=0", shell=True).wait()
 
-def enable_rcv_fairness(node=None):
+def set_rcv_fairness(node=None):
     if not node:
         Popen("sysctl -w net.ipv4.tcp_rcv_cc_fairness={}".format(args.rcv_fairness), shell=True).wait()
         return
 
     node.popen("sysctl -w net.ipv4.tcp_rcv_cc_fairness={}".format(args.rcv_fairness), shell=True).wait()
-
-def disable_rcv_fairness(node=None):
-    if not node:
-        Popen("sysctl -w net.ipv4.tcp_rcv_cc_fairness=0", shell=True).wait()
-        return
-
-    node.popen("sysctl -w net.ipv4.tcp_rcv_cc_fairness=0", shell=True).wait()
 
 def enable_rcv_rebase(node=None):
     if not node:
@@ -477,6 +501,20 @@ def disable_rcv_rebase(node=None):
         return
 
     node.popen("sysctl -w net.ipv4.tcp_rcv_cc_rebase=0", shell=True).wait()
+
+def enable_tcp_us_tstamp(node=None):
+    if not node:
+        Popen("sysctl -w net.ipv4.tcp_us_tstamp=1", shell=True).wait()
+        return
+
+    node.popen("sysctl -w net.ipv4.tcp_us_tstamp=1", shell=True).wait()
+
+def disable_tcp_us_tstamp(node=None):
+    if not node:
+        Popen("sysctl -w net.ipv4.tcp_us_tstamp=0", shell=True).wait()
+        return
+
+    node.popen("sysctl -w net.ipv4.tcp_us_tstamp=0", shell=True).wait()
 
 def set_hostbw(node=None):
     if not node:
@@ -529,35 +567,44 @@ def enable_cake(node=None):
     node.popen("ifconfig {}-ifb4eth0 up".format(node), shell=True).wait()
     node.popen("tc filter add dev {}-eth0 parent ffff: protocol all prio 10 u32 match u32 0 0 flowid 1:1 action mirred egress redirect dev {}-ifb4eth0".format(node, node), shell=True).wait()
 
+args.tcp = ""
+
 def enable_reno():
     Popen("/bin/echo reno > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
+    args.tcp = "reno"
 
 def enable_vegas():
     Popen("/bin/echo vegas > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
+    args.tcp = "vegas"
 
 def enable_westwood():
     Popen("/bin/echo westwood > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
+    args.tcp = "westwood"
 
 def enable_cubic():
     Popen("/bin/echo cubic > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
+    args.tcp = "cubic"
 
 def enable_cdg():
     Popen("modprobe tcp_cdg {}".format(args.cdg_args), shell=True)
     Popen("/bin/echo cdg > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
+    args.tcp = "cdg"
 
 def enable_relentless():
     Popen("/bin/echo relentless > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
+    args.tcp = "relentless"
 
 def disable_relentless():
     Popen("rmmod tcp_relentless", shell=True).wait()
 
 def enable_dctcp():
     force_ecn = ""
-    if args.ecn or args.hostecn:
+    if args.ecn or args.switchecn or args.hostecn:
         force_ecn = "dctcp_force_ecn=1"
 
     Popen("modprobe tcp_dctcp {} {}".format(force_ecn, args.dctcp_args), shell=True)
     Popen("/bin/echo dctcp > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
+    args.tcp = "dctcp"
 
 def disable_dctcp():
     Popen("rmmod tcp_dctcp", shell=True).wait()
@@ -565,17 +612,21 @@ def disable_dctcp():
 def enable_dctcpe():
     Popen("modprobe tcp_dctcpe", shell=True)
     Popen("/bin/echo dctcpe > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
+    args.tcp = "dctcpe"
 
 def disable_dctcpe():
     Popen("rmmod tcp_dctcpe", shell=True).wait()
 
 def enable_inigo():
     force_ecn = ""
-    if args.ecn or args.hostecn:
+    if args.ecn or args.switchecn or args.hostecn:
         force_ecn = "inigo_force_ecn=1"
 
+    output('loading inigo module\n')
     Popen("modprobe tcp_inigo {} {}".format(force_ecn, args.inigo_args), shell=True)
+    output('setting tcp to inigo\n')
     Popen("/bin/echo inigo > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
+    args.tcp = "inigo"
 
 def disable_inigo():
     Popen("rmmod tcp_inigo", shell=True).wait()
@@ -583,6 +634,7 @@ def disable_inigo():
 def enable_inigo_rttonly():
     Popen("modprobe tcp_inigo_rttonly {}".format(args.inigo_args), shell=True)
     Popen("/bin/echo inigo_rttonly > /proc/sys/net/ipv4/tcp_congestion_control", shell=True).wait()
+    args.tcp = "inigo_rtt_only"
 
 def disable_inigo_rttonly():
     Popen("rmmod tcp_inigo_rttonly", shell=True).wait()
@@ -656,20 +708,27 @@ def main():
     else:
         disable_rcv_cong()
 
+    if args.rcv_dctcp:
+        enable_rcv_dctcp()
+    else:
+        disable_rcv_dctcp()
+
     if args.rcv_mark:
         enable_rcv_mark()
     else:
         disable_rcv_mark()
 
-    if args.rcv_fairness:
-        enable_rcv_fairness()
-    else:
-        disable_rcv_fairness()
+    set_rcv_fairness()
 
     if args.rcv_rebase:
         enable_rcv_rebase()
     else:
         disable_rcv_rebase()
+
+    if args.tcp_us_tstamp:
+        enable_tcp_us_tstamp()
+    else:
+        disable_tcp_us_tstamp()
 
     s1 = net.getNodeByName('s1')
     h1 = net.getNodeByName('h1')
@@ -717,7 +776,7 @@ def main():
 
         s1.popen('tc qdisc change dev s1-eth{} handle 10: netem {}'.format(i, netem_args), shell=True).wait()
 
-        if args.ecn:
+        if args.ecn or args.switchecn:
             # set threshold according to DCTCP's 0.17*BDP rule of thumb
             cmd="tc qdisc change dev s1-eth{} handle 6: red {}".format(i, red_args)
             s1.popen(cmd, shell=True).wait()
@@ -747,14 +806,28 @@ def main():
             node.popen('echo 3000 > /sys/class/net/%s-eth0/queues/tx-0/byte_queue_limits/limit' % (nn), shell=True)
 
     tech = s1.cmd('cat /proc/sys/net/ipv4/tcp_congestion_control').rstrip('\r\n')
+    if not tech == args.tcp:
+        output('ERROR: {} not loaded, aborting experiment\n'.format(args.tcp))
+        net.stop()
+        sys.exit(-1)
+
     if args.fqcodel:
         tech = tech + '+fqcodel'
     if args.cake:
         tech = tech + '+cake'
     if args.ecn:
         tech = tech + '+ecn'
+    if args.switchecn:
+        tech = tech + '+switchecn'
     if args.hostecn:
-        tech = tech + '+hostecn'
+        if args.rcv_mark:
+            tech = tech + '+rcv_ecn'
+        else:
+            tech = tech + '+hostecn'
+    if args.rcv_cong:
+            tech = tech + '+rcv_cc'
+    if args.rcv_dctcp:
+            tech = tech + '+rcv_dctcp'
 
     exp_desc="{} Mbps, {} one way delay, tech: {}".format(args.bw, args.delay, tech)
     exp_output="bw{}-d{}-{}".format(args.bw, args.delay, tech)
@@ -807,7 +880,7 @@ def main():
 	#for i in xrange(args.n):
 	for i in xrange(1):
 	    node_name = 'h%d' % (i+1)
-	    net.getNodeByName(node_name).popen('tcpdump -ni %s-eth0 -s0 -w \
+	    net.getNodeByName(node_name).popen('tcpdump -ni %s-eth0 -s60 -w \
 		    %s/%s_tcpdump.pcap' % (node_name, args.dir, node_name), 
 		    shell=True)
             print "Waiting for tcpdump"
