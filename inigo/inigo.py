@@ -734,6 +734,22 @@ def main():
     h1 = net.getNodeByName('h1')
     h2 = net.getNodeByName('h2')
 
+    cmd = "tc -s qdisc show > %s/tc-stats-before.txt" % (args.dir)
+    s1.popen(cmd, shell=True)
+
+    for i in xrange(1, args.n):
+        node_name = 'h%d' % (i+1)
+        h = net.getNodeByName(node_name)
+        cmd = "/bin/netstat -s > %s/netstat-%s-before.txt" % (args.dir, node_name)
+        h.popen(cmd, shell=True)
+        cmd = "/sbin/ifconfig > %s/ifconfig-%s-before.txt" % (args.dir, node_name)
+        h.popen(cmd, shell=True)
+
+    net.getNodeByName('h1').pexec("/bin/netstat -s > %s/netstat-h1-before.txt" %
+	    args.dir, shell=True)
+    net.getNodeByName('h1').pexec("/sbin/ifconfig > %s/ifconfig-h1-before.txt" %
+	    args.dir, shell=True)
+
     # per node config
     for i in xrange(1, args.n + 1):
         nn = 'h%d' % (i)
@@ -931,22 +947,23 @@ def main():
     if args.iperf:
         progress(seconds + (args.n - 3) * offset * 2 + 1)
 
+    cmd = "tc -s qdisc show > %s/tc-stats-after.txt" % (args.dir)
+    s1.popen(cmd, shell=True)
+
     for i in xrange(1, args.n):
         node_name = 'h%d' % (i+1)
         h = net.getNodeByName(node_name)
-        cmd = "/bin/netstat -s > %s/netstat-%s.txt" % (args.dir, node_name)
+        cmd = "/bin/netstat -s > %s/netstat-%s-after.txt" % (args.dir, node_name)
         h.popen(cmd, shell=True)
-        cmd = "/sbin/ifconfig > %s/ifconfig-%s.txt" % (args.dir, node_name)
-        h.popen(cmd, shell=True)
-        cmd = "/sbin/tc > %s/tc-stats-%s.txt" % (args.dir, node_name)
+        cmd = "/sbin/ifconfig > %s/ifconfig-%s-after.txt" % (args.dir, node_name)
         h.popen(cmd, shell=True)
 
     for monitor in monitors:
         monitor.terminate()
 
-    net.getNodeByName('h1').pexec("/bin/netstat -s > %s/netstat-h1.txt" %
+    net.getNodeByName('h1').pexec("/bin/netstat -s > %s/netstat-h1-after.txt" %
 	    args.dir, shell=True)
-    net.getNodeByName('h1').pexec("/sbin/ifconfig > %s/ifconfig-h1.txt" %
+    net.getNodeByName('h1').pexec("/sbin/ifconfig > %s/ifconfig-h1-after.txt" %
 	    args.dir, shell=True)
 
     # config check
