@@ -535,14 +535,18 @@ def enable_fqcodel(node=None):
     if not node:
         return
 
-    enable_tcp_ecn(node)
+    target = 0.05*2*args.delay
+    interval = 2*args.delay
+    ecn = "noecn"
+    if args.ecn or args.hostecn:
+        ecn = "ecn"
 
     if args.bw <= 10:
-        node.popen("tc qdisc add dev {}-eth0 parent 5:1 handle 10: fq_codel limit 400 quantum 500".format(node), shell=True).wait()
+        node.popen("tc qdisc add dev {}-eth0 parent 5:1 handle 10: fq_codel limit 400 target {:.3f}ms interval {}ms quantum 500 {}".format(node, target, interval, ecn), shell=True).wait()
     elif args.bw <= 100:
-        node.popen("tc qdisc add dev {}-eth0 parent 5:1 handle 10: fq_codel limit 800".format(node), shell=True).wait()
+        node.popen("tc qdisc add dev {}-eth0 parent 5:1 handle 10: fq_codel limit 800 target {:.3f}ms interval {}ms {}".format(node, target, interval, ecn), shell=True).wait()
     else:
-        node.popen("tc qdisc add dev {}-eth0 parent 5:1 handle 10: fq_codel limit 1200".format(node), shell=True).wait()
+        node.popen("tc qdisc add dev {}-eth0 parent 5:1 handle 10: fq_codel limit 1200 target {:.3f}ms interval {}ms {}".format(node, target, interval, ecn), shell=True).wait()
 
 def enable_cake(node=None):
     if not node:
@@ -800,7 +804,7 @@ def main():
             cmd="tc qdisc add dev s1-eth{} parent 6: handle 10: netem {}".format(i, netem_args)
             s1.popen(cmd, shell=True).wait()
 
-        if args.hostbw > 0.0 and not (args.fq or args.fqcodel or args.cake) :
+        if args.hostbw > 0.0 and not (args.cake) :
             set_hostbw(node)
 
         if args.fq:

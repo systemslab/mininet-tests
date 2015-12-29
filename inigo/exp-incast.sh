@@ -14,21 +14,21 @@ export TEST_FLOW_DURATION=5
 export TEST_FLOW_OFFSET=0
 
 export TEST_SIZE=9
+N=$((${TEST_SIZE} - 1))
 
-
-./run-experiment.sh iperf incast-${TEST_SIZE}flows
-./postprocess.sh iperf incast-${TEST_SIZE}flows
+./run-experiment.sh iperf incast-${N}flows
+./postprocess.sh iperf incast-${N}flows
 
 # Receiver side congestion control
 export TEST_EXTRA_ARGS="--rcv-cong 1 --rcv-fairness 10"
 export TEST_ECN=""
-./run-experiment.sh iperf incast-${TEST_SIZE}flows-rcv_cc
-./postprocess.sh iperf incast-${TEST_SIZE}flows-rcv_cc
+./run-experiment.sh iperf incast-${N}flows-rcv_cc
+./postprocess.sh iperf incast-${N}flows-rcv_cc
 
-for i in $(ls -d iperf-incast-${TEST_SIZE}flows*); do
+for i in $(ls -d iperf-incast-${N}flows*); do
   cp ../util/bw_stats-incast.py /tmp/
   chmod u+x /tmp/bw_stats-incast.py
   cat $i/iperf.aggr/* >> /tmp/bw_stats-incast.py
   echo "print_stats(results)" >> /tmp/bw_stats-incast.py
-  /tmp/bw_stats-incast.py ${TEST_BW} $((${TEST_SIZE} - 1)) ${TEST_FLOW_DURATION} > $i/bw_stats.txt
+  /tmp/bw_stats-incast.py ${TEST_BW} $N ${TEST_FLOW_DURATION} > $i/bw_stats.txt
 done

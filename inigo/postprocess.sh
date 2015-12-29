@@ -113,6 +113,9 @@ postprocess () {
   #python $UTIL_DIR/plot_cpu.py -f $odir/cpu.txt -o $odir/cpu-${tech}.png
   #mv $odir/cpu-${tech}.png $graphdir/ &> /dev/null
 
+  mkdir -p $graphdir/pkt_stats
+  pkt_stats.sh $odir > $graphdir/pkt_stats/$tech
+
   if [ -f $odir/tcp_probe.txt ]; then
     mkdir -p $graphdir/srtt
     cd $odir
@@ -203,6 +206,10 @@ for tcp in $tcps; do
 done
 
 touch $graphdir/experiment.log
+
+cd $graphdir/pkt_stats
+grep -A1 seg * > ../pkt_stats.txt
+
 cd $graphdir/qlen
 
 for tcp in $tcps; do
