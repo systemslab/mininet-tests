@@ -24,7 +24,7 @@ else
 fi
 
 # different techniques to compare:
-# all combinations of tcp, ecn, and aqm are tried
+# all combinations of tcp, ecn, aqm, and receiver-side techniques are tried
 # plotting scripts may be limited to a fewer number
 #tcps="reno westwood vegas cubic inigo dctcp"
 tcps=${TEST_TCPS:="cubic"}
@@ -33,6 +33,8 @@ ntcps=$(echo $tcps | awk -F' ' '{print NF}')
 ecn=${TEST_ECN:=""}
 #aqms="fq fqcodel cake"
 aqms=${TEST_AQM:=""}
+#rcvs="rcv-cong rcv-dctcp rcv-mark"
+rcvs=${TEST_RCV:=""}
 
 # list combos for additional interesting plots
 expected_www_techs=${TEST_WWW:=""}
@@ -54,33 +56,60 @@ echo commmonargs: $commonargs
 echo rtt_us: $rtt_us
 
 function runexperiment () {
-  local loc_tcp="${1}"
-  local loc_ecn="${2}"
-  local loc_aqm="${3}"
-  local loc_tech="${1}"
-  allargs=""
-
+  sudo sysctl -w net.ipv4.tcp_rcv_congestion_control=0
+  sudo sysctl -w net.ipv4.tcp_rcv_ecn_marking=0
   for tcp_mod in $(lsmod | perl -ne '/^(tcp_\w+)/ && print "$1\n"'); do
       sudo rmmod $tcp_mod
   done
 
-  eval "$(echo ${1} | perl -ne '/(\w+)\+(\w+)/ && print "loc_tcp=$1; loc_ecn=$2\n"')"
-  eval "$(echo ${1} | perl -ne '/(\w+)\+(\w+)\+(\w+)/ && print "loc_tcp=$1; loc_ecn=$2; loc_aqm=$3\n"')"
+  local tcpA="${1}"
+  local tcpB="${2}"
+  local tcpC="${3}"
+  local tcpD="${4}"
+  local tech="${1}"
+  allargs=""
 
-  # use loc_ecn and/or an loc_aqm?
-  if [ "$loc_ecn" ]; then
-     allargs="$allargs --${loc_ecn}"
-     loc_tech="${loc_tcp}+${loc_ecn}"
-  fi
-  if [ "$loc_aqm" ]; then
-     allargs="$allargs --${loc_aqm}"
-     loc_tech="${loc_tcp}+${loc_ecn}+${loc_aqm}"
-  fi
-  odir=$experiment-$loc_tech-$note
-  allargs=" --dir $odir $commonargs --${loc_tcp} $allargs"
+  eval "$(echo ${1} | perl -ne '/(\w+)/ && print "tech1=$1\n"')"
+  eval "$(echo ${1} | perl -ne '/(\w+)\+([\w-]+)/ && print "tech1=$1; tech2=$2\n"')"
+  eval "$(echo ${1} | perl -ne '/(\w+)\+([\w-]+)\+([\w-]+)/ && print "tech1=$1; tech2=$2; tech3=$3\n"')"
+  eval "$(echo ${1} | perl -ne '/(\w+)\+([\w-]+)\+([\w-]+)\+([\w+-])/ && print "tech1=$1; tech2=$2; tech3=$3; tech4=$4\n"')"
 
-  mkdir $odir
+  if [ "$tech1" ]; then
+     allargs="$allargs --${tech1}"
+  fi
+  if [ "$tech2" ]; then
+     allargs="$allargs --${tech2}"
+  fi
+  if [ "$tech3" ]; then
+     allargs="$allargs --${tech3}"
+  fi
+  if [ "$tech4" ]; then
+     allargs="$allargs --${tech4}"
+  fi
+
+  if [ "$tcpB" ]; then
+     allargs="$allargs --${tcpB}"
+     tech="${tcpA}+${tcpB}"
+  fi
+  if [ "$tcpC" ]; then
+     allargs="$allargs --${tcpC}"
+     tech="${tcpA}+${tcpB}+${tcpC}"
+  fi
+  if [ "$tcpD" ]; then
+     allargs="$allargs --${tcpD}"
+     tech="${tcpA}+${tcpB}+${tcpC}+${tcpD}"
+  fi
+  odir=$experiment-$tech-$note
+
+  allargs=" --dir $odir $commonargs $allargs"
+  echo runexperiment tech="$tech" odir="$odir" args="$*"
+  echo -e "\tallargs=\"$allargs\""
+
+  mkdir -p $odir
   touch $odir/experiment.log
+  if [ -n "$DRYRUN" ]; then
+    return 0
+  fi
 
   echo sudo python inigo.py $allargs | tee -a $odir/experiment.log
   sudo bash -c "python inigo.py $allargs 2>&1 | tee -a $odir/experiment.log"
@@ -91,8 +120,9 @@ function runexperiment () {
 
   sudo mn -c
 
-  sudo bash -c "echo cubic > /proc/sys/net/ipv4/tcp_congestion_control"
-
+  sudo sysctl -w net.ipv4.tcp_congestion_control=cubic
+  sudo sysctl -w net.ipv4.tcp_rcv_congestion_control=0
+  sudo sysctl -w net.ipv4.tcp_rcv_ecn_marking=0
   for tcp_mod in $(lsmod | perl -ne '/^(tcp_\w+)/ && print "$1\n"'); do
       sudo rmmod $tcp_mod
   done
@@ -101,21 +131,45 @@ function runexperiment () {
 }
 
 for tcp in $tcps; do
-  echo runexperiment ${tcp}
+  #echo runexperiment ${tcp}
   runexperiment ${tcp}
 
-  if [ "${ecn}" ]; then
-    echo runexperiment ${tcp} ${ecn}
+  if [ "$rcvs" ]; then
+    for rcv in $rcvs; do
+      #echo runexperiment ${tcp} ${rcv}
+      runexperiment ${tcp} ${rcv}
+
+      if [ "$aqms" ]; then
+        for aqm in $aqms; do
+          #echo runexperiment ${tcp} ${aqm} ${rcv}
+          runexperiment ${tcp} ${aqm} ${rcv}
+          runexperiment ${tcp} ${aqm}
+
+          if [ "${ecn}" ]; then
+            #echo runexperiment ${tcp} ${ecn} ${aqm} ${rcv}
+            runexperiment ${tcp} ${ecn} ${aqm} ${rcv}
+            runexperiment ${tcp} ${ecn} ${aqm}
+          fi
+        done
+      elif [ "${ecn}" ]; then
+        #echo runexperiment ${tcp} ${ecn} ${rcv}
+        runexperiment ${tcp} ${ecn} ${rcv}
+        runexperiment ${tcp} ${ecn}
+      fi
+    done
+  elif [ "$aqms" ]; then
+    for aqm in $aqms; do
+      #echo runexperiment ${tcp} ${aqm}
+      runexperiment ${tcp} ${aqm}
+
+      if [ "${ecn}" ]; then
+        #echo runexperiment ${tcp} ${ecn} ${aqm}
+        runexperiment ${tcp} ${ecn} ${aqm}
+        runexperiment ${tcp} ${ecn}
+      fi
+    done
+  elif [ "${ecn}" ]; then
+    #echo runexperiment ${tcp} ${ecn}
     runexperiment ${tcp} ${ecn}
   fi
-
-  for aqm in $aqms; do
-    echo runexperiment ${tcp} ${aqm}
-    runexperiment ${tcp} ${aqm}
-
-    if [ "${ecn}" ]; then
-      echo runexperiment ${tcp} ${ecn} ${aqm}
-      runexperiment ${tcp} ${ecn} ${aqm}
-    fi
-  done
 done

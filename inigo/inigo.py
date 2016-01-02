@@ -291,21 +291,21 @@ parser.add_argument('--no-tcp-probe',
 
 parser.add_argument('--rcv-cong',
                     dest="rcv_cong",
-                    action="store",
-                    help="Enable receiver-based congestion control (0 to disable, 1 for RTT-based threshold, >1 for custom threshold %RTT)",
-                    default=0)
+                    action="store_true",
+                    help="Enable receiver-based congestion control",
+                    default=False)
 
 parser.add_argument('--rcv-dctcp',
                     dest="rcv_dctcp",
-                    action="store",
+                    action="store_true",
                     help="Enable receiver-based dctcp",
-                    default=0)
+                    default=False)
 
 parser.add_argument('--rcv-mark',
                     dest="rcv_mark",
-                    action="store",
+                    action="store_true",
                     help="Enable receiver-based ECN marking",
-                    default=0)
+                    default=False)
 
 parser.add_argument('--rcv-fairness',
                     dest="rcv_fairness",
@@ -441,10 +441,10 @@ def disable_tcp_ecn(node=None):
 
 def enable_rcv_cong(node=None):
     if not node:
-        Popen("sysctl -w net.ipv4.tcp_rcv_congestion_control={}".format(args.rcv_cong), shell=True).wait()
+        Popen("sysctl -w net.ipv4.tcp_rcv_congestion_control=1", shell=True).wait()
         return
 
-    node.popen("sysctl -w net.ipv4.tcp_rcv_congestion_control={}".format(args.rcv_cong), shell=True).wait()
+    node.popen("sysctl -w net.ipv4.tcp_rcv_congestion_control=1", shell=True).wait()
 
 def disable_rcv_cong(node=None):
     if not node:
@@ -455,10 +455,10 @@ def disable_rcv_cong(node=None):
 
 def enable_rcv_dctcp(node=None):
     if not node:
-        Popen("sysctl -w net.ipv4.tcp_rcv_dctcp={}".format(args.rcv_dctcp), shell=True).wait()
+        Popen("sysctl -w net.ipv4.tcp_rcv_dctcp=1", shell=True).wait()
         return
 
-    node.popen("sysctl -w net.ipv4.tcp_rcv_dctcp={}".format(args.rcv_dctcp), shell=True).wait()
+    node.popen("sysctl -w net.ipv4.tcp_rcv_dctcp=1", shell=True).wait()
 
 def disable_rcv_dctcp(node=None):
     if not node:
@@ -469,10 +469,10 @@ def disable_rcv_dctcp(node=None):
 
 def enable_rcv_mark(node=None):
     if not node:
-        Popen("sysctl -w net.ipv4.tcp_rcv_ecn_marking={}".format(args.rcv_mark), shell=True).wait()
+        Popen("sysctl -w net.ipv4.tcp_rcv_ecn_marking=1", shell=True).wait()
         return
 
-    node.popen("sysctl -w net.ipv4.tcp_rcv_ecn_marking={}".format(args.rcv_mark), shell=True).wait()
+    node.popen("sysctl -w net.ipv4.tcp_rcv_ecn_marking=1", shell=True).wait()
 
 def disable_rcv_mark(node=None):
     if not node:
@@ -535,8 +535,9 @@ def enable_fqcodel(node=None):
     if not node:
         return
 
-    target = 0.05*2*args.delay
-    interval = 2*args.delay
+    rtt = 2*args.delay
+    interval = 4*rtt        # on order of worst case RTT
+    target = 0.05*interval  # 5% of worst case
     ecn = "noecn"
     if args.ecn or args.hostecn:
         ecn = "ecn"

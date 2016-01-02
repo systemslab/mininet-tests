@@ -24,7 +24,7 @@ else
 fi
 
 # different techniques to compare:
-# all combinations of tcp, ecn, and aqm are tried
+# all combinations of tcp, ecn, aqm, and receiver-side techniques are tried
 # plotting scripts may be limited to a fewer number
 #tcps="reno westwood vegas cubic inigo dctcp"
 tcps=${TEST_TCPS:="cubic"}
@@ -33,6 +33,8 @@ ntcps=$(echo $tcps | awk -F' ' '{print NF}')
 ecn=${TEST_ECN:=""}
 #aqms="fq fqcodel cake"
 aqms=${TEST_AQM:=""}
+#rcvs="rcv-cong rcv-dctcp rcv-mark"
+rcvs=${TEST_RCV:=""}
 
 # list combos for additional interesting plots
 expected_www_techs=${TEST_WWW:=""}
@@ -50,9 +52,6 @@ maxq=${TEST_MAXQ:=425}		# size of bottleneck queue
 extra_args=${TEST_EXTRA_ARGS:=""}
 commonargs="--bw $bw --delay $delay --maxq $maxq -t $t --offset $offset -n $n $extra_args $exp_opt"
 
-echo commmonargs: $commonargs
-echo rtt_us: $rtt_us
-
 graphdir=$experiment-$note
 mkdir -p $graphdir
 
@@ -67,48 +66,70 @@ bz () {
 downsample () {
   infile=$1
   outfile=$2
+  percentageX1000=$3
 
   cat $infile | perl -e '
-    my $percentage = $ARGV[0];
+    my $percentageX1000 = $ARGV[0];
     my $outfile = $ARGV[1];
     open OUT1, ">", "$outfile" or die $!;
     while (<STDIN>) {
-        if (rand(100) < $percentage) { print OUT1 $_; }
+        if (rand(100000) < $percentageX1000) { print OUT1 $_; }
     }
     close OUT1 or die $!;
-' 10 $outfile
+' $percentageX1000 $outfile
 }
 
 postprocess () {
-  local loc_tcp="${1}"
-  local loc_ecn="${2}"
-  local loc_aqm="${3}"
-  local loc_tech="${1}"
+  local tcpA="${1}"
+  local tcpB="${2}"
+  local tcpC="${3}"
+  local tcpD="${4}"
+  local tech="${1}"
   allargs=""
 
-  eval "$(echo ${1} | perl -ne '/(\w+)\+(\w+)/ && print "loc_tcp=$1; loc_ecn=$2\n"')"
-  eval "$(echo ${1} | perl -ne '/(\w+)\+(\w+)\+(\w+)/ && print "loc_tcp=$1; loc_ecn=$2; loc_aqm=$3\n"')"
+  eval "$(echo ${1} | perl -ne '/(\w+)/ && print "tech1=$1\n"')"
+  eval "$(echo ${1} | perl -ne '/(\w+)\+([\w-]+)/ && print "tech1=$1; tech2=$2\n"')"
+  eval "$(echo ${1} | perl -ne '/(\w+)\+([\w-]+)\+([\w-]+)/ && print "tech1=$1; tech2=$2; tech3=$3\n"')"
+  eval "$(echo ${1} | perl -ne '/(\w+)\+([\w-]+)\+([\w-]+)\+([\w+-])/ && print "tech1=$1; tech2=$2; tech3=$3; tech4=$4\n"')"
 
-  # use loc_ecn and/or an loc_aqm?
-  if [ "$loc_ecn" ]; then
-     allargs="$allargs --${loc_ecn}"
-     loc_tech="${loc_tcp}+${loc_ecn}"
+  if [ "$tech1" ]; then
+     allargs="$allargs --${tech1}"
   fi
-  if [ "$loc_aqm" ]; then
-     allargs="$allargs --${loc_aqm}"
-     loc_tech="${loc_tcp}+${loc_ecn}+${loc_aqm}"
+  if [ "$tech2" ]; then
+     allargs="$allargs --${tech2}"
   fi
-  tech=$loc_tech
-  odir=$experiment-$loc_tech-$note
+  if [ "$tech3" ]; then
+     allargs="$allargs --${tech3}"
+  fi
+  if [ "$tech4" ]; then
+     allargs="$allargs --${tech4}"
+  fi
 
-  echo postprocess tech="$tech" odir="$odir"
+  if [ "$tcpB" ]; then
+     allargs="$allargs --${tcpB}"
+     tech="${tcpA}+${tcpB}"
+  fi
+  if [ "$tcpC" ]; then
+     allargs="$allargs --${tcpC}"
+     tech="${tcpA}+${tcpB}+${tcpC}"
+  fi
+  if [ "$tcpD" ]; then
+     allargs="$allargs --${tcpD}"
+     tech="${tcpA}+${tcpB}+${tcpC}+${tcpD}"
+  fi
+  odir=$experiment-$tech-$note
+
+  echo postprocess tech="$tech" odir="$odir" args="$*"
   user=$(whoami)
 
   sudo chown -R $user $odir
-  
+  if [ -n "$DRYRUN" ]; then
+    return 0
+  fi
+
   mkdir -p $graphdir/qlen
   mv $odir/qlen_s1-eth1.txt $graphdir/qlen/$tech &> /dev/null
-  
+
   #echo python $UTIL_DIR/plot_cpu.py -f $odir/cpu.txt -o $odir/cpu-${tech}.png
   #python $UTIL_DIR/plot_cpu.py -f $odir/cpu.txt -o $odir/cpu-${tech}.png
   #mv $odir/cpu-${tech}.png $graphdir/ &> /dev/null
@@ -124,7 +145,6 @@ postprocess () {
     grep -E "10.0.0.[0-9]+:[0-9]+ ${server}:" tcp_probe.txt > tcp_probe-to-10.0.0.1
 
     # doing this for each raw file (pre-downsampled) can take a long time
-    # uncomment if you still want it
     echo plot_tcpprobe.R $server $rtt_us tcp_probe-to-10.0.0.1
     plot_tcpprobe.R $server $rtt_us tcp_probe-to-10.0.0.1
     mv srtt-${server}.png srtt-${server}-${tech}.png &> /dev/null
@@ -136,10 +156,19 @@ postprocess () {
     mv ssthresh-${server}.png ssthresh-${server}-${tech}.png &> /dev/null
     mv wnd-${server}.png wnd-${server}-${tech}.png &> /dev/null
 
+    #  we want to get the latency index from the full data set
+    mv tcp_probe-to-10.0.0.1 ${tech}
+    echo plot_tcpprobe_srtt.R $rtt_us ${tech}
+    plot_tcpprobe_srtt.R $rtt_us ${tech} 2>&1 | tee -a srtts.txt
+    perl -ne '/"([\w\+-]+) (\w+) latency .*index (\d\.\d+)"/ && print "$1 $3\n"' srtts.txt > latency_index.txt
+    max_srtt=$(perl -ne '/"([\w\+-]+) max ([\d\.]+)"/ && print "$2"' srtts.txt)
+    mv srtt-cdf.png srtt-cdf-${tech}-full.png &> /dev/null
+
     # only keep the downsampled version, since the original grows so big
-    downsample tcp_probe-to-10.0.0.1 ../$graphdir/srtt/${tech}
-    #downsample tcp_probe-from-10.0.0.1 ../$graphdir/srtt/${tech}-from-10.0.0.1
-    rm tcp_probe.txt
+    # plus, the points in the plots tend to only be visible with around 200 samples
+    downsample ${tech} ../$graphdir/srtt/${tech} $((100000 * 200 / $(wc -l < ${tech})))
+    grep $max_srtt ${tech} >> ../$graphdir/srtt/${tech}
+    rm ${tech}
     cd -
   fi
 
@@ -183,32 +212,65 @@ postprocess () {
 
   # use gzip for pcap since wireshark understands that, but not other compression
   [ -f $odir/h1_tcpdump.pcap ] && gzip $odir/h1_tcpdump.pcap
-}
+} # end postprocess()
 
 for tcp in $tcps; do
-  echo postprocess ${tcp}
+  #echo postprocess ${tcp}
   postprocess ${tcp}
 
-  if [ "${ecn}" ]; then
-    echo postprocess ${tcp} ${ecn}
+  if [ "$rcvs" ]; then
+    for rcv in $rcvs; do
+      #echo postprocess ${tcp} ${rcv}
+      postprocess ${tcp} ${rcv}
+
+      if [ "$aqms" ]; then
+        for aqm in $aqms; do
+          #echo postprocess ${tcp} ${aqm} ${rcv}
+          postprocess ${tcp} ${aqm} ${rcv}
+          postprocess ${tcp} ${aqm}
+
+          if [ "${ecn}" ]; then
+            #echo postprocess ${tcp} ${ecn} ${aqm} ${rcv}
+            postprocess ${tcp} ${ecn} ${aqm} ${rcv}
+            postprocess ${tcp} ${ecn} ${aqm}
+          fi
+        done
+      elif [ "${ecn}" ]; then
+        #echo postprocess ${tcp} ${ecn} ${rcv}
+        postprocess ${tcp} ${ecn} ${rcv}
+        postprocess ${tcp} ${ecn}
+      fi
+    done
+  elif [ "$aqms" ]; then
+    for aqm in $aqms; do
+      #echo postprocess ${tcp} ${aqm}
+      postprocess ${tcp} ${aqm}
+
+      if [ "${ecn}" ]; then
+        #echo postprocess ${tcp} ${ecn} ${aqm}
+        postprocess ${tcp} ${ecn} ${aqm}
+        postprocess ${tcp} ${ecn}
+      fi
+    done
+  elif [ "${ecn}" ]; then
+    #echo postprocess ${tcp} ${ecn}
     postprocess ${tcp} ${ecn}
   fi
-
-  for aqm in $aqms; do
-    echo postprocess ${tcp} ${aqm}
-    postprocess ${tcp} ${aqm}
-
-    if [ "${ecn}" ]; then
-      echo postprocess ${tcp} ${ecn} ${aqm}
-      postprocess ${tcp} ${ecn} ${aqm}
-    fi
-  done
 done
+
+echo Comparison plots
+
+if [ -n "$DRYRUN" ]; then
+  exit
+fi
 
 touch $graphdir/experiment.log
 
+cat $experiment-*-$note/latency_index.txt | sort > $graphdir/latency_index.txt
+
 cd $graphdir/pkt_stats
 grep -A1 seg * > ../pkt_stats.txt
+cd -
 
 cd $graphdir/qlen
 
@@ -280,7 +342,6 @@ cd $graphdir/srtt
 tech="all"
 echo plot_tcpprobe_srtt.R $rtt_us *
 plot_tcpprobe_srtt.R $rtt_us * 2>&1 | tee -a ../experiment.log
-perl -ne '/"([\w\+]+) (\w+) latency index (\d\.\d+)"/ && print "$1 $3\n"' ../experiment.log | sort | uniq > ../latency_index.txt
 mv srtt.png srtt-${tech}.png &> /dev/null
 mv srtt-cdf.png srtt-cdf-${tech}.png &> /dev/null
 
