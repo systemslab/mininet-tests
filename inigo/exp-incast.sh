@@ -13,8 +13,8 @@ export TEST_BEST="dctcp+ecn inigo+ecn inigo cdg"
 export TEST_BW="500"
 export TEST_DELAY="2"
 export TEST_FLOW_DURATION=5
-export TEST_FLOW_OFFSET=5
-export TEST_SIZE=6
+export TEST_FLOW_OFFSET=0
+export TEST_SIZE=9
 N=$((${TEST_SIZE} - 1))
 
 # Default
