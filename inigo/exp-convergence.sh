@@ -21,6 +21,14 @@ N=$((${TEST_SIZE} - 1))
 ./run-experiment.sh iperf convergence-${N}flows
 ./postprocess.sh iperf convergence-${N}flows
 
+# Unconfigured switch failure mode
+export TEST_TCPS="dctcp+hostecn inigo+hostecn"
+export TEST_ECN=""
+export TEST_AQM=""
+export TEST_RCV=""
+./run-experiment.sh iperf convergence-${N}flows-hostecn
+./postprocess.sh iperf convergence-${N}flows-hostecn
+
 # AQM testing
 #export TEST_TCPS="dctcp+hostecn+fqcodel cdg+hostecn+fqcodel cubic+hostecn+fqcodel inigo+hostecn+fqcodel"
 #export TEST_TCPS="cubic cubic+hostecn+fqcodel"

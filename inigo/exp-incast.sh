@@ -21,6 +21,14 @@ N=$((${TEST_SIZE} - 1))
 ./run-experiment.sh iperf incast-${N}flows
 ./postprocess.sh iperf incast-${N}flows
 
+# Unconfigured switch failure mode
+export TEST_TCPS="dctcp+hostecn inigo+hostecn"
+export TEST_ECN=""
+export TEST_AQM=""
+export TEST_RCV=""
+./run-experiment.sh iperf incast-${N}flows-hostecn
+./postprocess.sh iperf incast-${N}flows-hostecn
+
 # AQM testing
 #export TEST_TCPS="dctcp+hostecn+fqcodel cdg+hostecn+fqcodel cubic+hostecn+fqcodel inigo+hostecn+fqcodel"
 #export TEST_TCPS="cubic cubic+hostecn+fqcodel"
