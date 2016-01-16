@@ -17,6 +17,8 @@ export TEST_FLOW_OFFSET=0
 export TEST_SIZE=9
 N=$((${TEST_SIZE} - 1))
 
+export TEST_EXTRA_ARGS="--tcpdump --disable_tcp_early_retrans --disable_tcp_fack"
+
 # Default
 ./run-experiment.sh iperf incast-${N}flows
 ./postprocess.sh iperf incast-${N}flows
@@ -29,16 +31,16 @@ export TEST_RCV=""
 ./run-experiment.sh iperf incast-${N}flows-hostecn
 ./postprocess.sh iperf incast-${N}flows-hostecn
 
-# AQM testing
-#export TEST_TCPS="dctcp+hostecn+fqcodel cdg+hostecn+fqcodel cubic+hostecn+fqcodel inigo+hostecn+fqcodel"
-#export TEST_TCPS="cubic cubic+hostecn+fqcodel"
-export TEST_TCPS="dctcp cdg cubic inigo"
-export TEST_ECN="hostecn"
-export TEST_AQM="fqcodel"
-export TEST_RCV=""
-export TEST_EXTRA_ARGS="--hostbw 0.9"
-./run-experiment.sh iperf incast-${N}flows-aqm
-./postprocess.sh iperf incast-${N}flows-aqm
+## AQM testing
+##export TEST_TCPS="dctcp+hostecn+fqcodel cdg+hostecn+fqcodel cubic+hostecn+fqcodel inigo+hostecn+fqcodel"
+##export TEST_TCPS="cubic cubic+hostecn+fqcodel"
+#export TEST_TCPS="dctcp cdg cubic inigo"
+#export TEST_ECN="hostecn"
+#export TEST_AQM="fqcodel"
+#export TEST_RCV=""
+#export TEST_EXTRA_ARGS="--hostbw 0.9"
+#./run-experiment.sh iperf incast-${N}flows-aqm
+#./postprocess.sh iperf incast-${N}flows-aqm
 
 for i in $(ls -d iperf-incast-${N}flows*); do
   cp ../util/bw_stats-incast.py /tmp/

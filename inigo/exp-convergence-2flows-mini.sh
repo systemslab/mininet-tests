@@ -21,7 +21,7 @@ export TEST_FLOW_OFFSET=5
 export TEST_SIZE=3
 
 # export TEST_EXTRA_ARGS="--loss \"random 2.5%\""
-export TEST_EXTRA_ARGS="--tcpdump"
+export TEST_EXTRA_ARGS="--tcpdump --disable_tcp_early_retrans --disable_tcp_fack"
 
 # initial spike in qlen/srtt, good performance
 #export TEST_EXTRA_ARGS="--inigo-args \"slowstart_rtt_observations_needed=20 ssmarkthresh=174 markthresh=300 minor_congestion=100 major_congestion=990 dctcp_alpha_on_init=250 persistent_congestion=10\""

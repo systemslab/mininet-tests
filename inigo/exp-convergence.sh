@@ -17,6 +17,8 @@ export TEST_FLOW_OFFSET=5
 export TEST_SIZE=6
 N=$((${TEST_SIZE} - 1))
 
+export TEST_EXTRA_ARGS="--tcpdump --disable_tcp_early_retrans --disable_tcp_fack"
+
 # Default
 ./run-experiment.sh iperf convergence-${N}flows
 ./postprocess.sh iperf convergence-${N}flows
@@ -30,15 +32,15 @@ export TEST_RCV=""
 ./postprocess.sh iperf convergence-${N}flows-hostecn
 
 # AQM testing
-#export TEST_TCPS="dctcp+hostecn+fqcodel cdg+hostecn+fqcodel cubic+hostecn+fqcodel inigo+hostecn+fqcodel"
-#export TEST_TCPS="cubic cubic+hostecn+fqcodel"
-export TEST_TCPS="dctcp cdg cubic inigo"
-export TEST_ECN="hostecn"
-export TEST_AQM="fqcodel"
-export TEST_RCV=""
-export TEST_EXTRA_ARGS="--hostbw 0.9"
-./run-experiment.sh iperf convergence-${N}flows-aqm
-./postprocess.sh iperf convergence-${N}flows-aqm
+##export TEST_TCPS="dctcp+hostecn+fqcodel cdg+hostecn+fqcodel cubic+hostecn+fqcodel inigo+hostecn+fqcodel"
+##export TEST_TCPS="cubic cubic+hostecn+fqcodel"
+#export TEST_TCPS="dctcp cdg cubic inigo"
+#export TEST_ECN="hostecn"
+#export TEST_AQM="fqcodel"
+#export TEST_RCV=""
+#export TEST_EXTRA_ARGS="--hostbw 0.9"
+#./run-experiment.sh iperf convergence-${N}flows-aqm
+#./postprocess.sh iperf convergence-${N}flows-aqm
 
 for i in $(ls -d iperf-convergence-${N}flows*); do
   cp ../util/bw_stats-convergence-${N}flows.py /tmp/

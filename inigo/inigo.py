@@ -331,6 +331,18 @@ parser.add_argument('--tcp-us-tstamp',
                     help="enable microsecond resolution TCP timestamps (default ms)",
                     default=False)
 
+parser.add_argument('--disable_tcp_early_retrans',
+                    dest="tcp_early_retrans",
+                    action="store_false",
+                    help="disable TCP early retransmit (default enabled)",
+                    default=True)
+
+parser.add_argument('--disable_tcp_fack',
+                    dest="tcp_fack",
+                    action="store_false",
+                    help="disable TCP fast retransmit (default enabled)",
+                    default=True)
+
 args = parser.parse_args()
 args.n = int(args.n)
 args.bw = float(args.bw)
@@ -521,6 +533,20 @@ def disable_tcp_us_tstamp(node=None):
         return
 
     node.popen("sysctl -w net.ipv4.tcp_us_tstamp=0", shell=True).wait()
+
+def disable_tcp_early_retrans(node=None):
+    if not node:
+        Popen("sysctl -w net.ipv4.tcp_early_retrans=0", shell=True).wait()
+        return
+
+    node.popen("sysctl -w net.ipv4.tcp_early_retrans=0", shell=True).wait()
+
+def disable_tcp_fack(node=None):
+    if not node:
+        Popen("sysctl -w net.ipv4.tcp_fack=0", shell=True).wait()
+        return
+
+    node.popen("sysctl -w net.ipv4.tcp_fack=0", shell=True).wait()
 
 def set_hostbw(node=None):
     if not node:
@@ -741,11 +767,20 @@ def main():
     else:
         disable_tcp_us_tstamp()
 
+    if not args.tcp_early_retrans:
+        disable_tcp_early_retrans()
+
+    if not args.tcp_fack:
+        disable_tcp_fack()
+
     s1 = net.getNodeByName('s1')
     h1 = net.getNodeByName('h1')
     h2 = net.getNodeByName('h2')
 
     cmd = "tc -s qdisc show > %s/tc-stats-before.txt" % (args.dir)
+    s1.popen(cmd, shell=True)
+
+    cmd = "sysctl -a > %s/sysctl.txt" % (args.dir)
     s1.popen(cmd, shell=True)
 
     for i in xrange(1, args.n):
