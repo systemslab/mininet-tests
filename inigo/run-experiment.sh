@@ -70,7 +70,7 @@ function runexperiment () {
   local tcpC="${3}"
   local tcpD="${4}"
   local tech="${1}"
-  allargs=""
+  allargs="--${experiment} ${exp_opt}"
 
   eval "$(echo ${1} | perl -ne '/(\w+)/ && print "tech1=$1\n"')"
   eval "$(echo ${1} | perl -ne '/(\w+)\+([\w-]+)/ && print "tech1=$1; tech2=$2\n"')"
