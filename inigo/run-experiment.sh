@@ -12,6 +12,9 @@ if [ -z "$1" ]; then
 elif [ "$1" == "iperf" ]; then
   experiment="iperf"
   exp_opt=""
+elif [ "$1" == "pcc" ]; then
+  experiment="pcc"
+  exp_opt=""
 else
   experiment=$1
   exp_opt="--flent $1"

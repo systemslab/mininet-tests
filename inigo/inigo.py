@@ -32,19 +32,25 @@ parser.add_argument('--iperf',
                     dest="iperf",
                     action="store_true",
                     help="Execute a basic iperf test",
-                    default=True)
+                    default=False)
 
 parser.add_argument('--convergence',
                     dest="convergence",
                     action="store_true",
                     help="Execute an iperf test similar to DCTCP's Fig. 16 convergence test",
-                    default=True)
+                    default=False)
 
 parser.add_argument('--flent',
                     dest="flent",
                     action="store",
                     help="Execute a Flent experiment instead of basic iperf test",
                     default=None)
+
+parser.add_argument('--pcc',
+                    dest="pcc",
+                    action="store_true",
+                    help="Execute a pcc test",
+                    default=False)
 
 parser.add_argument('--sysconfidence',
                     dest="sysconfidence",
@@ -106,7 +112,7 @@ parser.add_argument('-t',
 parser.add_argument('--offset',
                     dest="offset",
                     action="store",
-                    help="Seconds between iperf client starts",
+                    help="Seconds between clients start",
                     default=0)
 
 parser.add_argument('-u', '--udp',
@@ -220,7 +226,7 @@ parser.add_argument('--disable-offload',
 parser.add_argument('--mss',
                     dest="mss",
                     action="store",
-                    help="set Maximum Segment Size for iperf",
+                    help="set Maximum Segment Size for TCP",
                     default=0)
 
 parser.add_argument('--ecn',
@@ -827,7 +833,7 @@ def main():
             node.popen('echo 3000 > /sys/class/net/%s-eth0/queues/tx-0/byte_queue_limits/limit' % (nn), shell=True)
 
     tech = s1.cmd('cat /proc/sys/net/ipv4/tcp_congestion_control').rstrip('\r\n')
-    if not tech == args.tcp:
+    if not tech == args.tcp and not args.pcc:
         output('ERROR: {} not loaded, aborting experiment\n'.format(args.tcp))
         net.stop()
         sys.exit(-1)
@@ -859,18 +865,23 @@ def main():
 
     clients = [net.getNodeByName('h%d' % (i+1)) for i in xrange(1, args.n)]
 
-    if args.convergence:
+    if args.convergence and not args.pcc:
         args.iperf = True
 
-    print "starting iperf/netperf servers"
     if args.iperf:
+        print "starting iperf server"
         mss = ""
         if args.mss > 0:
             mss = "-M {} -m".format(args.mss)
 
         h1.sendCmd('iperf -s -y c -i 1 {} > {}/iperf_h1.txt'.format(mss, args.dir))
         waitListening(clients[0], h1, 5001)
+    elif args.pcc:
+        print "starting pcc server"
+        h1.sendCmd('appserver &> {}/pcc_server.log'.format(args.dir))
+        waitListening(clients[0], h1, 9000)
     elif args.flent:
+        print "starting netperf server"
         h1.sendCmd('netserver')
         waitListening(clients[0], h1, 12865)
 
@@ -926,6 +937,10 @@ def main():
                 cmd = 'iperf -c 10.0.0.1 -t %d -y c -i 1 %s -u -b %sM > %s/iperf_%s.txt' % (flowtime, mss, args.bw, args.dir, node_name)
             else:
                 cmd = 'iperf -c 10.0.0.1 -t %d -i 1 %s > %s/iperf_%s.txt' % (flowtime, mss, args.dir, node_name)
+            h.sendCmd(cmd)
+        elif args.pcc:
+	    print "Starting pcc client {}".format(node_name)
+            cmd = 'appclient 10.0.0.1 9000 > %s/pcc_%s.txt' % (args.dir, node_name)
             h.sendCmd(cmd)
         elif args.flent:
             title = "{} {}".format(h, exp_desc)
@@ -983,7 +998,14 @@ def main():
 #    print h1.cmd("echo h1 byte_queue_limits/limit && cat /sys/class/net/h1-eth0/queues/tx-0/byte_queue_limits/limit")
 #    print h1.cmd("echo h1 ifconfig && ifconfig h1-eth0")
 
-    Popen("killall -9 cat ping top bwm-ng iperf netserver &> /dev/null", shell=True).wait()
+    Popen("killall -9 cat ping top bwm-ng &> /dev/null", shell=True).wait()
+    if args.iperf:
+        Popen("killall -9 iperf &> /dev/null", shell=True).wait()
+    if args.pcc:
+        Popen("killall -9 appclient appserver &> /dev/null", shell=True).wait()
+    if args.flent:
+        Popen("killall -9 netserver &> /dev/null", shell=True).wait()
+
     net.stop()
     print "net stopped"
 
