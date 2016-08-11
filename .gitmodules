@@ -1,6 +1,7 @@
 [submodule "util"]
 	path = util
-	url = git@github.com:systemslab/mininet-util.git
+	url = https://github.com/systemslab/mininet-util.git
+	branch = inigo
 [submodule "tracing"]
 	path = tracing
-	url = git@github.com:mininet/mininet-tracing.git
+	url = https://github.com/mininet/mininet-tracing.git
